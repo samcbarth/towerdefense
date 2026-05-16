@@ -4,6 +4,8 @@ This browser build now supports sprite-first rendering with procedural fallback.
 
 You can drop PNGs into these folders and the game will use them automatically when the filenames match the manifest in [data.js](C:/Users/samcb/OneDrive/Desktop/GAMING/TowerDefense/docs/data.js).
 
+The repo now includes a wired-in free asset pack from Kenney under `docs/assets/sources/kenney-topdown/`, plus the baked game-ready PNGs under the folders below. The original pack license is mirrored at `docs/assets/kenney/LICENSE.txt`.
+
 Expected layout:
 
 ```txt
@@ -46,6 +48,6 @@ Guidelines:
 
 - Transparent PNGs work best.
 - Keep each sprite centered on its main body.
-- Tower sprites should face the same general isometric direction as the current procedural art.
+- The current live build uses Kenney top-down sprites, so matching a top-down or shallow-angle direction will blend in best.
 - If a file is missing, the renderer falls back to the current hand-drawn version.
 - If a sprite feels too large or too low/high on the tile, adjust its `width`, `height`, `anchorX`, or `anchorY` in `GAME_DATA.art`.
