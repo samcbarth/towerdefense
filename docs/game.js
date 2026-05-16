@@ -28,11 +28,31 @@ const towerDefs = GAME_DATA.towers;
 const enemyDefs = GAME_DATA.enemies;
 const waves = GAME_DATA.waves;
 const abilityDefs = GAME_DATA.abilities;
+function expandRectCells(rects = []) {
+  const cells = [];
+  rects.forEach((rect) => {
+    for (let y = rect.y; y < rect.y + rect.h; y++) {
+      for (let x = rect.x; x < rect.x + rect.w; x++) {
+        cells.push(`${x},${y}`);
+      }
+    }
+  });
+  return cells;
+}
+
+const terrainCells = Object.fromEntries(
+  Object.entries(GAME_DATA.grid.terrain || {}).map(([key, cells]) => [key, [...cells]])
+);
+
+Object.entries(GAME_DATA.grid.terrainRects || {}).forEach(([key, rects]) => {
+  terrainCells[key] = [...(terrainCells[key] || []), ...expandRectCells(rects)];
+});
+
 const grid = {
   ...GAME_DATA.grid,
-  blocked: new Set(GAME_DATA.grid.blocked),
+  blocked: new Set([...(GAME_DATA.grid.blocked || []), ...expandRectCells(GAME_DATA.grid.blockedRects)]),
   terrain: Object.fromEntries(
-    Object.entries(GAME_DATA.grid.terrain || {}).map(([key, cells]) => [key, new Set(cells)])
+    Object.entries(terrainCells).map(([key, cells]) => [key, new Set(cells)])
   ),
 };
 
@@ -817,12 +837,15 @@ function drawTerrainDetail(cell, key) {
 
 function drawBlockedDetail(cell, key) {
   const p = centerOf(cell);
+  const blockW = Math.max(16, grid.tileW * 0.56);
+  const blockH = Math.max(12, grid.tileH * 0.85);
+  const capW = blockW * 0.55;
   ctx.fillStyle = terrainHas("relay", key) ? "#102d2a" : "#111615";
-  ctx.fillRect(p.x - 18, p.y - 18, 36, 26);
+  ctx.fillRect(p.x - blockW / 2, p.y - blockH - 6, blockW, blockH + 6);
   ctx.fillStyle = terrainHas("relay", key) ? "#6ff3d0" : "#53645e";
-  ctx.fillRect(p.x - 10, p.y - 27, 20, 9);
+  ctx.fillRect(p.x - capW / 2, p.y - blockH - 13, capW, 7);
   ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-  ctx.strokeRect(p.x - 18, p.y - 18, 36, 26);
+  ctx.strokeRect(p.x - blockW / 2, p.y - blockH - 6, blockW, blockH + 6);
 }
 
 function drawTower(tower) {

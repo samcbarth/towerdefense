@@ -2,35 +2,58 @@ const GAME_DATA = {
   mission: {
     name: "Operation Blackline",
     subtitle: "Military-future WebGL tower defense prototype",
-    briefing: "Enemy armor is advancing across the Blackline depot. Build a legal maze around hangars, relay blocks, and fortified corridors while preserving one route to the base.",
-    startCredits: 440,
+    briefing: "Enemy armor is advancing across the expanded Blackline depot. Build a legal maze through a 30x30 industrial battlefield while preserving one route to the base.",
+    startCredits: 720,
     baseIntegrity: 100,
   },
   grid: {
-    cols: 17,
-    rows: 11,
-    tileW: 62,
-    tileH: 31,
+    cols: 30,
+    rows: 30,
+    tileW: 34,
+    tileH: 17,
     originX: 640,
-    originY: 72,
-    spawn: { x: 0, y: 5 },
-    base: { x: 16, y: 5 },
+    originY: 70,
+    spawn: { x: 0, y: 15 },
+    base: { x: 29, y: 15 },
     blocked: [
-      "4,1", "5,1", "6,1", "11,1", "12,1",
-      "3,2", "6,2", "10,2", "13,2",
-      "7,3", "8,3", "12,3",
-      "2,4", "5,4", "14,4",
-      "8,5", "9,5",
-      "2,6", "5,6", "14,6",
-      "7,7", "8,7", "12,7",
-      "3,8", "6,8", "10,8", "13,8",
-      "4,9", "5,9", "6,9", "11,9", "12,9"
+      "14,14", "15,14", "14,15", "15,15",
+      "6,6", "23,6", "6,23", "23,23"
+    ],
+    blockedRects: [
+      { x: 4, y: 3, w: 5, h: 2 },
+      { x: 11, y: 2, w: 3, h: 4 },
+      { x: 20, y: 3, w: 5, h: 2 },
+      { x: 3, y: 8, w: 3, h: 5 },
+      { x: 9, y: 9, w: 4, h: 2 },
+      { x: 17, y: 9, w: 4, h: 2 },
+      { x: 24, y: 8, w: 3, h: 5 },
+      { x: 6, y: 17, w: 4, h: 2 },
+      { x: 12, y: 18, w: 2, h: 5 },
+      { x: 16, y: 18, w: 2, h: 5 },
+      { x: 20, y: 17, w: 4, h: 2 },
+      { x: 4, y: 25, w: 5, h: 2 },
+      { x: 11, y: 24, w: 3, h: 3 },
+      { x: 20, y: 25, w: 5, h: 2 }
     ],
     terrain: {
-      reinforced: ["1,5", "15,5", "15,4", "15,6"],
-      hazard: ["8,4", "9,4", "8,6", "9,6"],
-      relay: ["4,1", "12,1", "4,9", "12,9"],
-      runway: ["0,5", "1,5", "2,5", "3,5", "4,5", "5,5", "6,5", "7,5", "10,5", "11,5", "12,5", "13,5", "14,5", "15,5", "16,5"],
+      reinforced: ["1,15", "28,15", "28,14", "28,16"],
+      hazard: ["13,13", "16,13", "13,16", "16,16"],
+      relay: ["6,6", "23,6", "6,23", "23,23"],
+      runway: ["0,15", "1,15", "2,15", "3,15", "4,15", "5,15", "6,15", "7,15", "8,15", "9,15", "10,15", "11,15", "12,15", "13,15", "16,15", "17,15", "18,15", "19,15", "20,15", "21,15", "22,15", "23,15", "24,15", "25,15", "26,15", "27,15", "28,15", "29,15"],
+    },
+    terrainRects: {
+      hazard: [
+        { x: 13, y: 12, w: 4, h: 1 },
+        { x: 13, y: 17, w: 4, h: 1 }
+      ],
+      reinforced: [
+        { x: 0, y: 14, w: 2, h: 3 },
+        { x: 28, y: 14, w: 2, h: 3 }
+      ],
+      runway: [
+        { x: 0, y: 14, w: 30, h: 1 },
+        { x: 0, y: 16, w: 30, h: 1 }
+      ]
     },
   },
   towers: {
