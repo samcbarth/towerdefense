@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iron Grid Defense</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="command-bar">
+      <div>
+        <p class="eyebrow">Operation Blackline</p>
+        <h1>Iron Grid Defense</h1>
+      </div>
+      <div class="status-row">
+        <span id="credits">Credits 0</span>
+        <span id="base">Base 100</span>
+        <span id="wave">Wave 0/0</span>
+      </div>
+    </section>
+
+    <section class="game-frame">
+      <canvas id="game" width="1280" height="720" aria-label="Tower defense battlefield"></canvas>
+      <div id="overlay" class="overlay">
+        <div class="overlay-panel">
+          <p class="eyebrow">WebGL-ready tactical prototype</p>
+          <h2>Hold the corridor.</h2>
+          <p>Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.</p>
+          <button id="start">Start Mission</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="hud">
+      <div>
+        <h2>Towers</h2>
+        <div id="towerButtons" class="button-grid"></div>
+      </div>
+      <div>
+        <h2>Commander</h2>
+        <div id="abilityButtons" class="button-grid"></div>
+      </div>
+      <div class="orders">
+        <h2>Selection</h2>
+        <p id="selection">Select a tower or commander ability.</p>
+        <div class="order-buttons">
+          <button id="upgrade" disabled>Upgrade</button>
+          <button id="sell" disabled>Sell</button>
+          <button id="nextWave">Launch Wave</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
+
