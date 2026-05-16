@@ -1069,6 +1069,13 @@ function showStartOverlay(message = "New mission ready. Choose a challenge mode,
   draw();
 }
 
+function hardResetMission() {
+  state.started = false;
+  clearSavedGame();
+  const url = new URL(window.location.href);
+  window.location.replace(`${url.pathname}${url.search}`);
+}
+
 function endGame(victory) {
   state.gameOver = true;
   state.victory = victory;
@@ -1341,7 +1348,7 @@ ui.loadGame.addEventListener("click", () => {
 ui.resetGame.addEventListener("click", () => {
   ensureAudio();
   playUi();
-  showStartOverlay();
+  hardResetMission();
 });
 ui.debugCredits.addEventListener("click", () => {
   if (!DEBUG_MODE) return;
