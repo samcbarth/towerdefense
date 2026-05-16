@@ -3,8 +3,11 @@ import {
   classifyBuildCell,
   createGrid,
   createStats,
+  describeWaveTraits,
+  effectiveTowerStats,
   findPath,
   makeTower,
+  scoreEnemyForTower,
   towerStats,
   towerUpgradeCost,
 } from "../modules/core.js";
@@ -71,6 +74,29 @@ const grid = createGrid(GAME_DATA.grid);
   tower.level = 2;
   const stats = towerStats(tower);
   assert(stats.splash > GAME_DATA.towers.missile.splash, "cluster branch should improve splash");
+}
+
+{
+  const tower = makeTower(GAME_DATA.towers, "missile", 4, 14);
+  tower.branch = "bunker";
+  tower.level = 2;
+  const target = { def: GAME_DATA.enemies.carrier, shield: 0, slowUntil: 999, armorShredUntil: 0 };
+  const stats = effectiveTowerStats(tower, target, 1);
+  assert(stats.damage > towerStats(tower).damage, "bunker missiles should gain damage against slowed targets");
+}
+
+{
+  const tower = makeTower(GAME_DATA.towers, "drone", 4, 14);
+  tower.branch = "interceptor";
+  tower.level = 2;
+  const supportScore = scoreEnemyForTower(tower, { def: GAME_DATA.enemies.mender }, 3, 1);
+  const normalScore = scoreEnemyForTower(tower, { def: GAME_DATA.enemies.scout }, 3, 1);
+  assert(supportScore < normalScore, "interceptor drones should prioritize support enemies");
+}
+
+{
+  const traits = describeWaveTraits(GAME_DATA.waves, GAME_DATA.enemies, 3);
+  assert(traits.includes("Splits"), "wave intel should surface splitter threats");
 }
 
 {

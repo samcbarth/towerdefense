@@ -76,3 +76,4 @@ Before release, run through these browser checks:
 7. Trigger base damage and confirm the red pulse appears.
 8. Finish both defeat and victory flows and confirm the mission summary is readable.
 9. Open `?debug=1` locally and confirm the debug credits, skip wave, and clear save buttons work.
+10. Start each challenge mode once and confirm credits, sell rules, enemy durability, scoring, and restart behavior match the selected mode.

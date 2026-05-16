@@ -32,7 +32,10 @@ export function createStats() {
   return {
     towersBuilt: 0,
     towersSold: 0,
+    upgradesPurchased: 0,
     enemiesDestroyed: 0,
+    enemiesLeaked: 0,
+    baseDamageTaken: 0,
     damageDealt: 0,
     abilitiesUsed: 0,
     wavesCleared: 0,
@@ -113,6 +116,10 @@ export function towerStats(tower) {
     bossMultiplier: 1,
     breaksShield: false,
     armorShred: 0,
+    slowDamageMultiplier: 1,
+    shreddedDamageMultiplier: 1,
+    shieldlessDamageMultiplier: 1,
+    priority: tower.def.priority || "nearest",
     color: tower.def.color,
     accent: tower.def.accent,
   };
@@ -128,8 +135,38 @@ export function towerStats(tower) {
   stats.bossMultiplier = tier.bossMultiplier || 1;
   stats.breaksShield = Boolean(tier.breaksShield);
   stats.armorShred = tier.armorShred || 0;
+  stats.slowDamageMultiplier = tier.slowDamageMultiplier || stats.slowDamageMultiplier;
+  stats.shreddedDamageMultiplier = tier.shreddedDamageMultiplier || stats.shreddedDamageMultiplier;
+  stats.shieldlessDamageMultiplier = tier.shieldlessDamageMultiplier || stats.shieldlessDamageMultiplier;
+  stats.priority = tier.priority || stats.priority;
   stats.accent = branchData(tower).color || stats.accent;
   return stats;
+}
+
+export function effectiveTowerStats(tower, target, now = performance.now() / 1000) {
+  const stats = towerStats(tower);
+  const targetSlowed = target && target.slowUntil && now < target.slowUntil;
+  const targetShredded = target && target.armorShredUntil && now < target.armorShredUntil && target.armorShred > 0;
+  const targetShieldless = target && (target.def.shield || 0) > 0 && target.shield <= 0;
+
+  return {
+    ...stats,
+    damage: stats.damage
+      * (targetSlowed ? stats.slowDamageMultiplier : 1)
+      * (targetShredded ? stats.shreddedDamageMultiplier : 1)
+      * (targetShieldless ? stats.shieldlessDamageMultiplier : 1),
+  };
+}
+
+export function scoreEnemyForTower(tower, enemy, distanceTiles, now = performance.now() / 1000) {
+  const stats = towerStats(tower);
+  let score = distanceTiles;
+  if (stats.priority === "armor") score -= Math.min(8, enemy.def.armor || 0) * 0.28;
+  if (stats.priority === "boss" && (enemy.def.boss || enemy.def.threat === "Mini-Boss")) score -= 2.2;
+  if (stats.priority === "swarm" && enemy.def.threat === "Swarm") score -= 1.4;
+  if (stats.priority === "support" && (enemy.def.jammer || enemy.def.repairAura)) score -= 2.0;
+  if (enemy.slowUntil && now < enemy.slowUntil) score -= 0.25;
+  return score;
 }
 
 export function isOccupied(state, x, y, ignoreTower = null) {
@@ -231,11 +268,15 @@ export function describeWaveTraits(waves, enemyDefs, index) {
   const wave = waves[index];
   if (!wave) return "No more threats scheduled.";
   const traits = new Set();
+  if (wave.intel) traits.add(wave.intel);
   wave.groups.forEach((group) => {
     const def = enemyDefs[group.type];
     if (def.threat) traits.add(def.threat);
     if (def.boss) traits.add("Boss");
     if (def.jammer) traits.add("Disruptor");
+    if (def.repairAura) traits.add("Support");
+    if (def.splitInto) traits.add("Splits");
+    if (def.regen) traits.add("Regenerates");
     if (def.shield) traits.add("Shielded");
     if ((def.armor || 0) >= 6) traits.add("Armored");
   });

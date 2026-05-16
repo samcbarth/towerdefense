@@ -36,6 +36,7 @@ const ui = {
   overlayText: document.getElementById("overlayText"),
   resultStats: document.getElementById("resultStats"),
   start: document.getElementById("start"),
+  challengeModes: document.getElementById("challengeModes"),
   waveTraits: document.getElementById("waveTraits"),
   towerDetails: document.getElementById("towerDetails"),
   battleBanner: document.getElementById("battleBanner"),
@@ -50,6 +51,7 @@ const towerDefs = GAME_DATA.towers;
 const enemyDefs = GAME_DATA.enemies;
 const waves = GAME_DATA.waves;
 const abilityDefs = GAME_DATA.abilities;
+const challengeDefs = GAME_DATA.challenges || {};
 const BASE_CANVAS_WIDTH = 1280;
 const BASE_CANVAS_HEIGHT = 860;
 const SPEED_STEPS = [1, 1.5, 2];
@@ -83,6 +85,7 @@ const state = {
   started: false,
   paused: false,
   speedIndex: 0,
+  challengeKey: "standard",
   credits: GAME_DATA.mission.startCredits,
   base: GAME_DATA.mission.baseIntegrity,
   waveIndex: 0,
@@ -106,6 +109,7 @@ const state = {
   lastTime: 0,
   pauseStartedAt: 0,
   basePulse: 0,
+  screenShake: 0,
   banner: { text: "", life: 0 },
   stats: Core.createStats(),
 };
@@ -406,7 +410,10 @@ function chooseBranchUpgrade(branchKey) {
   tower.branch = branchKey;
   tower.level = 2;
   tower.cooldown = 0;
+  state.stats.upgradesPurchased += 1;
   setMessage(`${tower.def.name} branched into ${branch.name}.`, true);
+  const pos = centerOf(tower);
+  addEffect(pos.x, pos.y - 20, branch.color || tower.def.accent, 0.6, 58);
   playDeploy();
   state.upgradeKey = "";
   saveGameState();
@@ -414,6 +421,21 @@ function chooseBranchUpgrade(branchKey) {
 
 function towerStats(tower) {
   return Core.towerStats(tower);
+}
+
+function challenge() {
+  return challengeDefs[state.challengeKey] || challengeDefs.standard || {
+    name: "Standard",
+    scoreMultiplier: 1,
+    startCreditsMultiplier: 1,
+    enemyHpMultiplier: 1,
+    rewardMultiplier: 1,
+    noSell: false,
+  };
+}
+
+function startingCredits() {
+  return Math.round(GAME_DATA.mission.startCredits * (challenge().startCreditsMultiplier || 1));
 }
 
 function addLog(message) {
@@ -431,26 +453,11 @@ function showBanner(text, life = 1.8) {
 }
 
 function describeWave(index) {
-  const wave = waves[index];
-  if (!wave) return "Mission complete";
-  return wave.groups
-    .map((group) => `${group.count} ${enemyDefs[group.type].name}`)
-    .join(" + ");
+  return Core.describeWave(waves, enemyDefs, index);
 }
 
 function describeWaveTraits(index) {
-  const wave = waves[index];
-  if (!wave) return "No more threats scheduled.";
-  const traits = new Set();
-  wave.groups.forEach((group) => {
-    const def = enemyDefs[group.type];
-    if (def.threat) traits.add(def.threat);
-    if (def.boss) traits.add("Boss");
-    if (def.jammer) traits.add("Disruptor");
-    if (def.shield) traits.add("Shielded");
-    if ((def.armor || 0) >= 6) traits.add("Armored");
-  });
-  return traits.size ? `Traits: ${Array.from(traits).join(" / ")}` : "Traits: Standard assault";
+  return Core.describeWaveTraits(waves, enemyDefs, index);
 }
 
 function snapshotAbilityCooldowns() {
@@ -501,7 +508,8 @@ function loadGameState(manual = false) {
     state.paused = Boolean(save.paused);
     state.pauseStartedAt = state.paused ? performance.now() / 1000 : 0;
     state.speedIndex = Math.max(0, Math.min(SPEED_STEPS.length - 1, Number(save.speedIndex) || 0));
-    state.credits = Number(save.credits) || GAME_DATA.mission.startCredits;
+    state.challengeKey = challengeDefs[save.challengeKey] ? save.challengeKey : "standard";
+    state.credits = Number(save.credits) || startingCredits();
     state.base = Number(save.base) || GAME_DATA.mission.baseIntegrity;
     state.waveIndex = Number(save.waveIndex) || 0;
     state.waveActive = Boolean(save.waveActive);
@@ -528,13 +536,18 @@ function loadGameState(manual = false) {
             def,
             hp: Number(enemy.hp) || def.hp,
             maxHp: Number(enemy.maxHp) || def.hp,
+            reward: Number(enemy.reward) || def.reward,
             shield: Number(enemy.shield) || 0,
+            maxShield: Number(enemy.maxShield) || Number(enemy.shield) || def.shield || 0,
             path: Array.isArray(enemy.path) ? enemy.path.map((cell) => ({ x: cell.x, y: cell.y })) : [],
             pathIndex: Math.max(0, Number(enemy.pathIndex) || 0),
             x: Number(enemy.x) || 0,
             y: Number(enemy.y) || 0,
             slowUntil: Number(enemy.slowUntil) || 0,
             slowMultiplier: Number(enemy.slowMultiplier) || 1,
+            armorShred: Number(enemy.armorShred) || 0,
+            armorShredUntil: Number(enemy.armorShredUntil) || 0,
+            splitDepth: Number(enemy.splitDepth) || 0,
             reached: Boolean(enemy.reached),
           };
         }).filter(Boolean)
@@ -546,6 +559,7 @@ function loadGameState(manual = false) {
     state.projectiles = [];
     state.effects = [];
     state.basePulse = 0;
+    state.screenShake = 0;
     state.banner = { text: "", life: 0 };
     state.message = save.message || "Mission restored.";
     state.log = Array.isArray(save.log) && save.log.length ? save.log.slice(0, 5) : ["Mission restored."];
@@ -555,7 +569,10 @@ function loadGameState(manual = false) {
     state.stats = {
       towersBuilt: Number(save.stats?.towersBuilt) || 0,
       towersSold: Number(save.stats?.towersSold) || 0,
+      upgradesPurchased: Number(save.stats?.upgradesPurchased) || 0,
       enemiesDestroyed: Number(save.stats?.enemiesDestroyed) || 0,
+      enemiesLeaked: Number(save.stats?.enemiesLeaked) || 0,
+      baseDamageTaken: Number(save.stats?.baseDamageTaken) || 0,
       damageDealt: Number(save.stats?.damageDealt) || 0,
       abilitiesUsed: Number(save.stats?.abilitiesUsed) || 0,
       wavesCleared: Number(save.stats?.wavesCleared) || 0,
@@ -576,22 +593,30 @@ function loadGameState(manual = false) {
   }
 }
 
-function spawnEnemy(type) {
+function spawnEnemy(type, options = {}) {
   const def = enemyDefs[type];
-  const path = currentPath();
+  const path = options.path || (options.cell ? findPathFrom(options.cell) : currentPath()) || currentPath();
   const pos = centerOf(path[0]);
+  const hpMultiplier = (options.hpMultiplier || 1) * (challenge().enemyHpMultiplier || 1);
+  const rewardMultiplier = (options.rewardMultiplier || 1) * (challenge().rewardMultiplier || 1);
+  const maxHp = Math.round(def.hp * hpMultiplier);
   state.enemies.push({
     type,
     def,
-    hp: def.hp,
-    maxHp: def.hp,
-    shield: def.shield || 0,
+    hp: maxHp,
+    maxHp,
+    reward: Math.max(1, Math.round(def.reward * rewardMultiplier)),
+    shield: Math.round((def.shield || 0) * hpMultiplier),
+    maxShield: Math.round((def.shield || 0) * hpMultiplier),
     path,
     pathIndex: 0,
-    x: pos.x,
-    y: pos.y,
+    x: options.x ?? pos.x,
+    y: options.y ?? pos.y,
     slowUntil: 0,
     slowMultiplier: 1,
+    armorShred: 0,
+    armorShredUntil: 0,
+    splitDepth: options.splitDepth || 0,
     reached: false,
   });
 }
@@ -616,7 +641,13 @@ function queueWave() {
 
 function damageEnemy(enemy, amount, options = {}) {
   if (options.breaksShield) enemy.shield = 0;
-  const effectiveArmor = Math.max(0, (enemy.def.armor || 0) - (options.armorPierce || 0) - (options.armorShred || 0));
+  const now = performance.now() / 1000;
+  if (options.armorShred) {
+    enemy.armorShred = Math.max(enemy.armorShred || 0, options.armorShred);
+    enemy.armorShredUntil = Math.max(enemy.armorShredUntil || 0, now + 4.5);
+  }
+  const activeShred = enemy.armorShredUntil && now < enemy.armorShredUntil ? enemy.armorShred || 0 : 0;
+  const effectiveArmor = Math.max(0, (enemy.def.armor || 0) - (options.armorPierce || 0) - activeShred);
   let damage = Math.max(1, amount * (enemy.def.boss ? options.bossMultiplier || 1 : 1) - effectiveArmor);
   state.stats.damageDealt += damage;
   if (enemy.shield > 0) {
@@ -630,8 +661,23 @@ function damageEnemy(enemy, amount, options = {}) {
     enemy.slowUntil = performance.now() / 1000 + (options.slowTime || 1.5);
   }
   if (enemy.hp <= 0) {
-    state.credits += enemy.def.reward;
+    state.credits += enemy.reward || enemy.def.reward;
     addEffect(enemy.x, enemy.y, enemy.def.color, 0.4, 28);
+    if (enemy.def.splitInto && (enemy.splitDepth || 0) < 1) {
+      const split = enemy.def.splitInto;
+      const cell = Core.screenToCell(grid, enemy.x, enemy.y);
+      for (let i = 0; i < split.count; i++) {
+        spawnEnemy(split.type, {
+          cell,
+          x: enemy.x + (i - (split.count - 1) / 2) * 12,
+          y: enemy.y + (i % 2 ? 8 : -8),
+          hpMultiplier: split.hpMultiplier || 0.75,
+          rewardMultiplier: split.rewardMultiplier || 0.5,
+          splitDepth: (enemy.splitDepth || 0) + 1,
+        });
+      }
+      addEffect(enemy.x, enemy.y, "#ffdf7e", 0.35, 44);
+    }
     enemy.dead = true;
     state.stats.enemiesDestroyed += 1;
   }
@@ -658,11 +704,28 @@ function updateSpawning(dt) {
 function updateEnemies(dt, now) {
   for (const enemy of state.enemies) {
     if (enemy.dead) continue;
+    if (enemy.def.regen && enemy.hp < enemy.maxHp) {
+      enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.def.regen * dt);
+    }
+    if (enemy.def.repairAura) {
+      for (const ally of state.enemies) {
+        if (ally === enemy || ally.dead) continue;
+        const dist = Math.hypot(ally.x - enemy.x, ally.y - enemy.y);
+        if (dist < 115) {
+          ally.hp = Math.min(ally.maxHp, ally.hp + 8 * dt);
+          if (ally.maxShield && ally.shield < ally.maxShield) ally.shield = Math.min(ally.maxShield, ally.shield + 10 * dt);
+        }
+      }
+    }
     if (enemy.pathIndex >= enemy.path.length - 1) {
       enemy.reached = true;
-      state.base -= enemy.def.boss ? 35 : 8;
+      const baseDamage = enemy.def.boss ? 35 : enemy.def.threat === "Mini-Boss" ? 18 : 8;
+      state.base -= baseDamage;
+      state.stats.enemiesLeaked += 1;
+      state.stats.baseDamageTaken += baseDamage;
       enemy.dead = true;
       state.basePulse = 1;
+      state.screenShake = Math.max(state.screenShake, enemy.def.boss ? 1 : 0.55);
       addEffect(enemy.x, enemy.y, "#ff6f5f", 0.55, 44);
       playBaseHit();
       continue;
@@ -673,7 +736,8 @@ function updateEnemies(dt, now) {
     const dy = target.y - enemy.y;
     const dist = Math.hypot(dx, dy);
     const slow = now < enemy.slowUntil ? enemy.slowMultiplier : 1;
-    const speed = enemy.def.speed * slow * 72;
+    const menderBoost = state.enemies.some((ally) => ally !== enemy && ally.def.repairAura && Math.hypot(ally.x - enemy.x, ally.y - enemy.y) < 115) ? 1.08 : 1;
+    const speed = enemy.def.speed * slow * menderBoost * 72;
 
     if (dist < speed * dt) {
       enemy.x = target.x;
@@ -711,21 +775,23 @@ function updateTowers(dt) {
   for (const tower of state.towers) {
     tower.cooldown -= dt;
     if (tower.cooldown > 0) continue;
-    const stats = towerStats(tower);
+    let stats = towerStats(tower);
     const origin = centerOf(tower);
     let target = null;
     let best = Infinity;
 
     for (const enemy of state.enemies) {
       const dist = Math.hypot(enemy.x - origin.x, enemy.y - origin.y) / grid.tileW;
-      if (dist <= stats.range && dist < best) {
+      const score = Core.scoreEnemyForTower(tower, enemy, dist);
+      if (dist <= stats.range && score < best) {
         target = enemy;
-        best = dist;
+        best = score;
       }
     }
 
     if (!target) continue;
 
+    stats = Core.effectiveTowerStats(tower, target);
     const jammerPenalty = state.enemies.some((enemy) => enemy.def.jammer && Math.hypot(enemy.x - origin.x, enemy.y - origin.y) < 160) ? 1.35 : 1;
     tower.cooldown = stats.fireRate * jammerPenalty;
 
@@ -788,6 +854,7 @@ function updateProjectiles(dt) {
           }
         }
         addEffect(p.target.x, p.target.y, p.color, 0.35, 42);
+        state.screenShake = Math.max(state.screenShake, 0.18);
         playImpact(true);
       } else {
         damageEnemy(p.target, p.damage, {
@@ -799,12 +866,15 @@ function updateProjectiles(dt) {
           armorShred: p.armorShred,
         });
         addEffect(p.target.x, p.target.y, p.color, 0.22, 18);
+        if (p.damage > 100 || p.target.def.boss) state.screenShake = Math.max(state.screenShake, 0.12);
         playImpact(p.target.def.boss);
       }
       p.dead = true;
     } else {
-      p.x += (dx / dist) * p.speed * dt;
-      p.y += (dy / dist) * p.speed * dt;
+      p.vx = (dx / dist) * p.speed;
+      p.vy = (dy / dist) * p.speed;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
     }
   }
   state.projectiles = state.projectiles.filter((p) => !p.dead && (p.life === undefined || p.life > 0));
@@ -814,6 +884,7 @@ function updateEffects(dt) {
   state.effects.forEach((effect) => effect.life -= dt);
   state.effects = state.effects.filter((effect) => effect.life > 0);
   state.basePulse = Math.max(0, state.basePulse - dt * 2.4);
+  state.screenShake = Math.max(0, state.screenShake - dt * 3.2);
   if (state.banner.life > 0) state.banner.life = Math.max(0, state.banner.life - dt);
 }
 
@@ -910,7 +981,10 @@ function upgradeSelected() {
   }
   state.credits -= cost;
   tower.level++;
+  state.stats.upgradesPurchased += 1;
   setMessage(`${tower.def.name} upgraded to tier ${tower.level}.`, true);
+  const pos = centerOf(tower);
+  addEffect(pos.x, pos.y - 20, towerStats(tower).accent, 0.55, 54);
   playDeploy();
   state.upgradeKey = "";
   saveGameState();
@@ -919,6 +993,11 @@ function upgradeSelected() {
 function sellSelected() {
   const tower = state.selectedTower;
   if (!tower) return;
+  if (challenge().noSell) {
+    setMessage("Locked Emplacements challenge: selling is disabled.", true);
+    playDenied();
+    return;
+  }
   state.credits += Math.round(tower.def.cost * (0.5 + tower.level * 0.18));
   state.towers = state.towers.filter((item) => item !== tower);
   state.selectedTower = null;
@@ -929,11 +1008,11 @@ function sellSelected() {
 }
 
 function renderMissionSummary(victory) {
-  UiPanel.renderMissionSummary(ui.resultStats, state.stats, waves.length);
+  UiPanel.renderMissionSummary(ui.resultStats, state.stats, waves.length, state.base, victory, challenge());
   ui.overlayTitle.textContent = victory ? "Sector secured." : "Base overrun.";
   ui.overlayText.textContent = victory
-    ? "The line held. Restart to chase a cleaner clear or try a different branch plan."
-    : "Base integrity failed. Restart with a tighter maze, stronger branch timing, and better anti-armor coverage.";
+    ? UiPanel.missionDiagnosis(state.stats, true)
+    : UiPanel.missionDiagnosis(state.stats, false);
 }
 
 function resetMissionChrome() {
@@ -970,7 +1049,7 @@ function restart() {
     started: true,
     paused: false,
     speedIndex: 0,
-    credits: GAME_DATA.mission.startCredits,
+    credits: startingCredits(),
     base: GAME_DATA.mission.baseIntegrity,
     waveIndex: 0,
     waveActive: false,
@@ -993,6 +1072,7 @@ function restart() {
     lastTime: performance.now(),
     pauseStartedAt: 0,
     basePulse: 0,
+    screenShake: 0,
     banner: { text: "", life: 0 },
     stats: Core.createStats(),
   });
@@ -1028,7 +1108,7 @@ function updateUi() {
   UiPanel.renderTowerDetails(ui.towerDetails, state.selectedTower);
   ui.upgrade.disabled = !state.selectedTower || state.selectedTower.level >= 3;
   ui.upgrade.textContent = state.selectedTower ? UiPanel.towerUpgradeLabel(state.selectedTower) : "Upgrade";
-  ui.sell.disabled = !state.selectedTower;
+  ui.sell.disabled = !state.selectedTower || challenge().noSell;
   ui.nextWave.disabled = state.waveActive || state.gameOver || !state.started || state.paused;
   ui.pauseToggle.disabled = !state.started || state.gameOver;
   ui.pauseToggle.textContent = state.paused ? "Resume" : "Pause";
@@ -1051,6 +1131,9 @@ function updateUi() {
     button.classList.toggle("active", button.dataset.ability === state.selectedAbility);
     const label = button.querySelector("span");
     label.textContent = remaining > 0 ? `${Math.ceil(remaining)}s cooldown` : ability.text;
+  });
+  document.querySelectorAll("[data-challenge]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.challenge === state.challengeKey);
   });
 
   const upgradeKey = state.selectedTower
@@ -1082,6 +1165,21 @@ function tick(nowMs) {
 }
 
 function buildButtons() {
+  Object.entries(challengeDefs).forEach(([key, mode]) => {
+    const button = document.createElement("button");
+    button.className = "challenge-button";
+    button.dataset.challenge = key;
+    button.innerHTML = `<strong>${mode.name}</strong><span>${mode.description}</span>`;
+    button.addEventListener("click", () => {
+      ensureAudio();
+      state.challengeKey = key;
+      setMessage(`${mode.name} challenge selected.`);
+      playUi();
+      updateUi();
+    });
+    ui.challengeModes.appendChild(button);
+  });
+
   Object.entries(towerDefs).forEach(([key, tower]) => {
     const button = document.createElement("button");
     button.className = "tower-button";

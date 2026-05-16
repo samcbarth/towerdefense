@@ -6,6 +6,44 @@ export const GAME_DATA = {
     startCredits: 720,
     baseIntegrity: 100,
   },
+  challenges: {
+    standard: {
+      name: "Standard",
+      description: "Balanced mission rules.",
+      scoreMultiplier: 1,
+      startCreditsMultiplier: 1,
+      enemyHpMultiplier: 1,
+      rewardMultiplier: 1,
+      noSell: false,
+    },
+    lowCredit: {
+      name: "Lean Budget",
+      description: "Start with fewer credits for a higher grade bonus.",
+      scoreMultiplier: 1.18,
+      startCreditsMultiplier: 0.76,
+      enemyHpMultiplier: 1,
+      rewardMultiplier: 1.05,
+      noSell: false,
+    },
+    elite: {
+      name: "Elite Columns",
+      description: "Enemies arrive tougher, but pay slightly better.",
+      scoreMultiplier: 1.28,
+      startCreditsMultiplier: 1,
+      enemyHpMultiplier: 1.18,
+      rewardMultiplier: 1.12,
+      noSell: false,
+    },
+    noSell: {
+      name: "Locked Emplacements",
+      description: "Selling is disabled after towers are placed.",
+      scoreMultiplier: 1.22,
+      startCreditsMultiplier: 1,
+      enemyHpMultiplier: 1,
+      rewardMultiplier: 1.08,
+      noSell: true,
+    },
+  },
   grid: {
     cols: 30,
     rows: 30,
@@ -66,24 +104,26 @@ export const GAME_DATA = {
       color: "#8fb0bb",
       accent: "#e9f7ff",
       text: "Fast single target",
-      role: "Reliable anti-scout fire.",
+      role: "Reliable anti-scout fire and finisher coverage.",
       branches: {
         rapid: {
           name: "Rapid Fire",
           color: "#91f0ff",
-          description: "Higher fire rate and range for shredding light waves.",
+          role: "Anti-swarm sustained fire",
+          description: "Higher fire rate, range, and shieldless follow-up for light waves.",
           tiers: [
-            { cost: 110, fireRateMultiplier: 0.68, rangeBonus: 0.25, damageMultiplier: 1.08 },
-            { cost: 185, fireRateMultiplier: 0.52, rangeBonus: 0.45, damageMultiplier: 1.18 }
+            { cost: 105, fireRateMultiplier: 0.64, rangeBonus: 0.25, damageMultiplier: 1.02, shieldlessDamageMultiplier: 1.12, priority: "swarm" },
+            { cost: 180, fireRateMultiplier: 0.48, rangeBonus: 0.45, damageMultiplier: 1.12, shieldlessDamageMultiplier: 1.22, priority: "swarm" }
           ],
         },
         piercer: {
           name: "Armor Piercer",
           color: "#ffd36a",
+          role: "Cheap armor answer",
           description: "Armor bypass rounds for carriers and boss pressure.",
           tiers: [
-            { cost: 125, damageMultiplier: 1.35, armorPierce: 5, rangeBonus: 0.15 },
-            { cost: 210, damageMultiplier: 1.78, armorPierce: 11, rangeBonus: 0.3 }
+            { cost: 130, damageMultiplier: 1.32, armorPierce: 6, rangeBonus: 0.12, priority: "armor" },
+            { cost: 215, damageMultiplier: 1.7, armorPierce: 12, rangeBonus: 0.25, shreddedDamageMultiplier: 1.12, priority: "armor" }
           ],
         },
       },
@@ -103,19 +143,21 @@ export const GAME_DATA = {
         cluster: {
           name: "Cluster Warheads",
           color: "#ffdf7e",
-          description: "Wider splash and faster reload for swarm control.",
+          role: "Swarm and split cleanup",
+          description: "Wider splash and faster reload for swarm and splitter cleanup.",
           tiers: [
-            { cost: 180, splashBonus: 0.55, fireRateMultiplier: 0.86, damageMultiplier: 1.08 },
-            { cost: 285, splashBonus: 1.05, fireRateMultiplier: 0.76, damageMultiplier: 1.18 }
+            { cost: 175, splashBonus: 0.65, fireRateMultiplier: 0.84, damageMultiplier: 1.04, priority: "swarm" },
+            { cost: 295, splashBonus: 1.2, fireRateMultiplier: 0.72, damageMultiplier: 1.12, priority: "swarm" }
           ],
         },
         bunker: {
           name: "Bunker Buster",
           color: "#ff8f5d",
-          description: "Heavy warheads punch armor and hit bosses harder.",
+          role: "Armor and boss burst",
+          description: "Heavy warheads punch armor, exploit slows, and hit bosses harder.",
           tiers: [
-            { cost: 205, damageMultiplier: 1.45, armorPierce: 8, splashBonus: 0.15 },
-            { cost: 325, damageMultiplier: 2.0, armorPierce: 15, bossMultiplier: 1.28 }
+            { cost: 205, damageMultiplier: 1.42, armorPierce: 8, splashBonus: 0.1, slowDamageMultiplier: 1.16, priority: "armor" },
+            { cost: 335, damageMultiplier: 1.92, armorPierce: 16, bossMultiplier: 1.3, slowDamageMultiplier: 1.24, priority: "boss" }
           ],
         },
       },
@@ -135,19 +177,21 @@ export const GAME_DATA = {
         overcharge: {
           name: "Overcharge Beam",
           color: "#9bb8ff",
+          role: "Boss and shredded armor execution",
           description: "Massive damage and armor piercing at a slower cadence.",
           tiers: [
-            { cost: 250, damageMultiplier: 1.58, armorPierce: 9, fireRateMultiplier: 1.1 },
-            { cost: 380, damageMultiplier: 2.25, armorPierce: 19, bossMultiplier: 1.22, fireRateMultiplier: 1.18 }
+            { cost: 250, damageMultiplier: 1.55, armorPierce: 10, shreddedDamageMultiplier: 1.18, fireRateMultiplier: 1.1, priority: "armor" },
+            { cost: 390, damageMultiplier: 2.15, armorPierce: 20, bossMultiplier: 1.24, shreddedDamageMultiplier: 1.32, fireRateMultiplier: 1.18, priority: "boss" }
           ],
         },
         cycling: {
           name: "Capacitor Cycling",
           color: "#75f0ff",
-          description: "Faster rail shots with improved range for lane coverage.",
+          role: "Long-range lane coverage",
+          description: "Faster rail shots with improved range for wide lane coverage.",
           tiers: [
-            { cost: 240, fireRateMultiplier: 0.72, rangeBonus: 0.5, damageMultiplier: 1.12 },
-            { cost: 350, fireRateMultiplier: 0.56, rangeBonus: 0.8, damageMultiplier: 1.25 }
+            { cost: 230, fireRateMultiplier: 0.7, rangeBonus: 0.5, damageMultiplier: 1.1 },
+            { cost: 345, fireRateMultiplier: 0.54, rangeBonus: 0.85, damageMultiplier: 1.24 }
           ],
         },
       },
@@ -168,19 +212,21 @@ export const GAME_DATA = {
         freeze: {
           name: "Deep Freeze",
           color: "#9effff",
-          description: "Longer, stronger slows for holding enemies in kill zones.",
+          role: "Kill-zone control",
+          description: "Longer, stronger slows for holding enemies in missile kill zones.",
           tiers: [
-            { cost: 150, slowMultiplier: 0.3, slowTimeBonus: 1.7, rangeBonus: 0.25 },
-            { cost: 235, slowMultiplier: 0.2, slowTimeBonus: 3.1, rangeBonus: 0.5 }
+            { cost: 145, slowMultiplier: 0.3, slowTimeBonus: 1.9, rangeBonus: 0.25, priority: "support" },
+            { cost: 240, slowMultiplier: 0.2, slowTimeBonus: 3.4, rangeBonus: 0.55, priority: "support" }
           ],
         },
         breaker: {
           name: "Shield Breaker",
           color: "#fff4aa",
-          description: "Breaks shields and strips armor while still slowing.",
+          role: "Shield break and armor shred",
+          description: "Breaks shields and leaves armor shredded for other towers.",
           tiers: [
-            { cost: 165, breaksShield: true, armorShred: 5, damageMultiplier: 1.2 },
-            { cost: 260, breaksShield: true, armorShred: 10, damageMultiplier: 1.55, slowTimeBonus: 1.0 }
+            { cost: 165, breaksShield: true, armorShred: 5, damageMultiplier: 1.15, slowTimeBonus: 0.4, priority: "armor" },
+            { cost: 265, breaksShield: true, armorShred: 11, damageMultiplier: 1.45, slowTimeBonus: 1.3, priority: "armor" }
           ],
         },
       },
@@ -200,19 +246,21 @@ export const GAME_DATA = {
         interceptor: {
           name: "Interceptor Swarm",
           color: "#e0b6ff",
-          description: "Fast drone launches for broad coverage against light units.",
+          role: "Map-wide fast response",
+          description: "Fast drone launches for broad coverage against light and support units.",
           tiers: [
-            { cost: 210, fireRateMultiplier: 0.66, rangeBonus: 0.35, damageMultiplier: 1.08 },
-            { cost: 325, fireRateMultiplier: 0.48, rangeBonus: 0.7, damageMultiplier: 1.18 }
+            { cost: 205, fireRateMultiplier: 0.66, rangeBonus: 0.4, damageMultiplier: 1.06, priority: "support" },
+            { cost: 320, fireRateMultiplier: 0.48, rangeBonus: 0.75, damageMultiplier: 1.16, priority: "support" }
           ],
         },
         hunter: {
           name: "Hunter-Killer Drones",
           color: "#ff9cee",
-          description: "Hard-hitting drones focus heavy targets and bosses.",
+          role: "Boss pursuit and armor cleanup",
+          description: "Hard-hitting drones exploit shredded armor and focus heavies.",
           tiers: [
-            { cost: 225, damageMultiplier: 1.48, armorPierce: 5, bossMultiplier: 1.16 },
-            { cost: 355, damageMultiplier: 1.95, armorPierce: 10, bossMultiplier: 1.38 }
+            { cost: 225, damageMultiplier: 1.42, armorPierce: 5, bossMultiplier: 1.16, shreddedDamageMultiplier: 1.14, priority: "armor" },
+            { cost: 360, damageMultiplier: 1.86, armorPierce: 11, bossMultiplier: 1.38, shreddedDamageMultiplier: 1.26, priority: "boss" }
           ],
         },
       },
@@ -224,17 +272,20 @@ export const GAME_DATA = {
     shield: { name: "Shield Drone", hp: 125, speed: 1.0, reward: 28, color: "#80f6ff", armor: 2, shield: 55, threat: "Shield" },
     swarm: { name: "Swarm Bot", hp: 44, speed: 1.35, reward: 10, color: "#ff9969", armor: 0, threat: "Swarm" },
     jammer: { name: "Jammer", hp: 150, speed: 0.95, reward: 34, color: "#de7dff", armor: 1, jammer: true, threat: "Disruptor" },
+    splitter: { name: "Splitter Node", hp: 118, speed: 1.05, reward: 24, color: "#f6b05d", armor: 1, splitInto: { type: "swarm", count: 3, hpMultiplier: 0.75, rewardMultiplier: 0.45 }, threat: "Splits" },
+    mender: { name: "Field Mender", hp: 175, speed: 0.82, reward: 44, color: "#6ff3a4", armor: 2, repairAura: true, regen: 5, threat: "Support" },
     bastion: { name: "Bastion Tank", hp: 390, speed: 0.56, reward: 90, color: "#86a2b1", armor: 8, shield: 65, threat: "Mini-Boss" },
     boss: { name: "Siege Walker", hp: 1400, speed: 0.42, reward: 240, color: "#ff6f5f", armor: 10, boss: true, threat: "Boss" },
   },
   waves: [
-    { name: "Recon Probe", reward: 100, groups: [{ type: "scout", count: 8, gap: 0.75 }] },
-    { name: "Swarm Screen", reward: 120, groups: [{ type: "scout", count: 8, gap: 0.5 }, { type: "swarm", count: 10, gap: 0.32 }] },
-    { name: "Shielded Armor", reward: 140, groups: [{ type: "carrier", count: 5, gap: 0.9 }, { type: "shield", count: 3, gap: 0.85 }] },
-    { name: "Signal Jam", reward: 150, groups: [{ type: "swarm", count: 20, gap: 0.22 }, { type: "jammer", count: 3, gap: 1.1 }] },
-    { name: "Heavy Push", reward: 185, groups: [{ type: "carrier", count: 6, gap: 0.72 }, { type: "shield", count: 4, gap: 0.68 }, { type: "bastion", count: 1, gap: 0.25 }] },
-    { name: "Combined Arms", reward: 205, groups: [{ type: "scout", count: 12, gap: 0.4 }, { type: "jammer", count: 4, gap: 0.78 }, { type: "carrier", count: 6, gap: 0.78 }, { type: "bastion", count: 1, gap: 1.0 }] },
-    { name: "Siege Walker", reward: 0, groups: [{ type: "swarm", count: 10, gap: 0.24 }, { type: "boss", count: 1, gap: 0.1 }, { type: "shield", count: 5, gap: 0.62 }, { type: "jammer", count: 2, gap: 1.15 }] },
+    { name: "Recon Probe", intel: "Fast openers", reward: 100, groups: [{ type: "scout", count: 8, gap: 0.72 }] },
+    { name: "Swarm Screen", intel: "Splash check", reward: 120, groups: [{ type: "scout", count: 7, gap: 0.48 }, { type: "swarm", count: 12, gap: 0.3 }] },
+    { name: "Shielded Armor", intel: "Pierce or shield break", reward: 145, groups: [{ type: "carrier", count: 5, gap: 0.86 }, { type: "shield", count: 4, gap: 0.78 }] },
+    { name: "Signal Jam", intel: "Support target priority", reward: 160, groups: [{ type: "swarm", count: 18, gap: 0.22 }, { type: "jammer", count: 3, gap: 1.0 }, { type: "splitter", count: 2, gap: 0.75 }] },
+    { name: "Repair Column", intel: "Kill support before heavies", reward: 180, groups: [{ type: "mender", count: 3, gap: 1.0 }, { type: "carrier", count: 6, gap: 0.72 }, { type: "shield", count: 4, gap: 0.64 }] },
+    { name: "Heavy Push", intel: "Mini-boss armor test", reward: 205, groups: [{ type: "carrier", count: 6, gap: 0.68 }, { type: "splitter", count: 4, gap: 0.52 }, { type: "bastion", count: 1, gap: 0.25 }] },
+    { name: "Combined Arms", intel: "Everything at once", reward: 230, groups: [{ type: "scout", count: 10, gap: 0.38 }, { type: "jammer", count: 3, gap: 0.78 }, { type: "mender", count: 2, gap: 0.9 }, { type: "carrier", count: 6, gap: 0.72 }, { type: "bastion", count: 1, gap: 1.0 }] },
+    { name: "Siege Walker", intel: "Final boss with escorts", reward: 0, groups: [{ type: "swarm", count: 8, gap: 0.22 }, { type: "boss", count: 1, gap: 0.1 }, { type: "shield", count: 5, gap: 0.58 }, { type: "jammer", count: 2, gap: 1.05 }, { type: "mender", count: 2, gap: 1.1 }] },
   ],
   abilities: {
     airstrike: { name: "Airstrike", cooldown: 18, radius: 1.35, damage: 180, color: "#ffcf5a", text: "Area burst" },

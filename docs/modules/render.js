@@ -107,7 +107,10 @@ function drawEnemyMarkers(ctx, enemy, width, y) {
   const markers = [
     enemy.shield > 0 ? "#80f6ff" : null,
     enemy.def.armor > 0 ? "#ffcf5a" : null,
+    enemy.armorShredUntil && enemy.armorShredUntil > performance.now() / 1000 ? "#fff4aa" : null,
     enemy.def.jammer ? "#de7dff" : null,
+    enemy.def.repairAura ? "#6ff3a4" : null,
+    enemy.def.splitInto ? "#f6b05d" : null,
     enemy.def.boss ? "#ff6f5f" : null,
   ].filter(Boolean);
   markers.forEach((color, index) => {
@@ -131,6 +134,21 @@ function drawEnemy(ctx, enemy) {
     ctx.strokeStyle = "#80f6ff";
     ctx.lineWidth = 2;
     ctx.strokeRect(enemy.x - width / 2 - 4, enemy.y - height / 2 - 4, width + 8, height + 8);
+  }
+  if (enemy.def.repairAura) {
+    ctx.strokeStyle = "rgba(111, 243, 164, 0.45)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, 34, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  if (enemy.armorShredUntil && enemy.armorShredUntil > performance.now() / 1000) {
+    ctx.strokeStyle = "#fff4aa";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(enemy.x - width / 2, enemy.y + height / 2 + 5);
+    ctx.lineTo(enemy.x + width / 2, enemy.y + height / 2 + 5);
+    ctx.stroke();
   }
   const hpPct = Math.max(0, enemy.hp / enemy.maxHp);
   ctx.fillStyle = "#1d2624";
@@ -158,6 +176,11 @@ function hoverFill(grid, state, cell, fallback) {
 
 export function drawBattlefield(ctx, canvas, grid, state) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  if (state.screenShake > 0) {
+    const shake = state.screenShake * 8;
+    ctx.translate(Math.sin(state.screenShake * 57) * shake, Math.cos(state.screenShake * 43) * shake);
+  }
   const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
   grad.addColorStop(0, "#0b1714");
   grad.addColorStop(1, "#14201c");
@@ -211,6 +234,14 @@ export function drawBattlefield(ctx, canvas, grid, state) {
       ctx.lineTo(p.tx, p.ty);
       ctx.stroke();
     } else {
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.32;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x - (p.vx || 0) * 0.04, p.y - (p.vy || 0) * 0.04);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
@@ -226,4 +257,5 @@ export function drawBattlefield(ctx, canvas, grid, state) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 1;
   }
+  ctx.restore();
 }
