@@ -8,7 +8,7 @@ import {
   towerStats,
   towerUpgradeCost,
 } from "../modules/core.js";
-import { migrateSave, serializeState } from "../modules/storage.js";
+import { isTerminalSave, migrateSave, serializeState } from "../modules/storage.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -86,6 +86,32 @@ const grid = createGrid(GAME_DATA.grid);
   assert(migrated.version === 3, "v2 saves should migrate to v3");
   assert(migrated.waveCountdown === 0, "migrated saves should default wave countdown");
   assert(migrated.stats.towersBuilt === 1, "migrated saves should preserve stats");
+}
+
+{
+  const terminalSave = {
+    version: 3,
+    started: true,
+    base: 84,
+    waveIndex: GAME_DATA.waves.length,
+    waveActive: false,
+    spawnQueue: [],
+    enemies: [],
+  };
+  assert(isTerminalSave(terminalSave, GAME_DATA.waves.length), "completed missions should be treated as terminal saves");
+}
+
+{
+  const activeSave = {
+    version: 3,
+    started: true,
+    base: 84,
+    waveIndex: GAME_DATA.waves.length - 1,
+    waveActive: true,
+    spawnQueue: [],
+    enemies: [{ type: "drone" }],
+  };
+  assert(!isTerminalSave(activeSave, GAME_DATA.waves.length), "active missions should remain loadable");
 }
 
 console.log("core tests passed");

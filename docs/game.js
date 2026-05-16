@@ -490,6 +490,11 @@ function loadGameState(manual = false) {
     if (manual) setMessage("No saved mission found.", true);
     return false;
   }
+  if (Storage.isTerminalSave(save, waves.length)) {
+    clearSavedGame();
+    if (manual) setMessage("Saved mission had already ended. Starting fresh.", true);
+    return false;
+  }
 
   try {
     state.started = Boolean(save.started);
@@ -697,8 +702,8 @@ function updateEnemies(dt, now) {
     } else {
       setMessage(`Wave cleared. +${clearedWave.reward} credits. Prepare for wave ${state.waveIndex + 1}.`, true);
       showBanner(`Wave cleared +${clearedWave.reward} credits`, 2.2);
+      saveGameState();
     }
-    saveGameState();
   }
 }
 

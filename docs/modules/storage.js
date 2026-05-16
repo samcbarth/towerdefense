@@ -102,6 +102,18 @@ export function migrateSave(rawSave) {
   return null;
 }
 
+export function isTerminalSave(save, totalWaves) {
+  if (!save || typeof save !== "object") return false;
+  if (Number(save.base) <= 0) return true;
+
+  const waveIndex = Number(save.waveIndex);
+  const waveActive = Boolean(save.waveActive);
+  const spawnQueue = Array.isArray(save.spawnQueue) ? save.spawnQueue : [];
+  const enemies = Array.isArray(save.enemies) ? save.enemies : [];
+
+  return waveIndex >= totalWaves && !waveActive && spawnQueue.length === 0 && enemies.length === 0;
+}
+
 export function readSavedGame(storage = localStorage) {
   try {
     const raw = storage.getItem(STORAGE_KEY) || LEGACY_KEYS.map((key) => storage.getItem(key)).find(Boolean);
