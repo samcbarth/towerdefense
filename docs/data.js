@@ -12,7 +12,7 @@ const GAME_DATA = {
     tileW: 34,
     tileH: 17,
     originX: 640,
-    originY: 70,
+    originY: 78,
     spawn: { x: 0, y: 15 },
     base: { x: 29, y: 15 },
     blocked: [

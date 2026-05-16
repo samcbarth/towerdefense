@@ -27,8 +27,7 @@
       </div>
     </section>
 
-    <section class="game-frame">
-      <canvas id="game" width="1280" height="720" aria-label="Tower defense battlefield"></canvas>
+    <section class="battlefield-layout">
       <aside class="mission-panel">
         <p class="eyebrow">Mission Briefing</p>
         <h2 id="missionName">Operation Blackline</h2>
@@ -38,12 +37,15 @@
           <strong id="waveComposition">No wave loaded</strong>
         </div>
       </aside>
-      <div id="overlay" class="overlay">
-        <div class="overlay-panel">
-          <p class="eyebrow">WebGL-ready tactical prototype</p>
-          <h2>Hold the corridor.</h2>
-          <p>Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.</p>
-          <button id="start">Start Mission</button>
+      <div class="game-frame">
+        <canvas id="game" width="1280" height="860" aria-label="Tower defense battlefield"></canvas>
+        <div id="overlay" class="overlay">
+          <div class="overlay-panel">
+            <p class="eyebrow">WebGL-ready tactical prototype</p>
+            <h2>Hold the corridor.</h2>
+            <p>Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.</p>
+            <button id="start">Start Mission</button>
+          </div>
         </div>
       </div>
     </section>

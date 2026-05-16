@@ -56,6 +56,20 @@ const grid = {
   ),
 };
 
+function fitGridToCanvas() {
+  const paddingX = 76;
+  const paddingTop = 58;
+  const paddingBottom = 94;
+  const maxTileW = Math.floor((canvas.width - paddingX * 2) * 2 / (grid.cols + grid.rows));
+  const maxTileH = Math.floor((canvas.height - paddingTop - paddingBottom) * 2 / (grid.cols + grid.rows));
+  grid.tileW = Math.max(24, Math.min(grid.tileW, maxTileW));
+  grid.tileH = Math.max(12, Math.min(grid.tileH, maxTileH));
+  grid.originX = canvas.width / 2;
+  grid.originY = paddingTop;
+}
+
+fitGridToCanvas();
+
 const state = {
   started: false,
   credits: GAME_DATA.mission.startCredits,
