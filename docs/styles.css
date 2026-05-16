@@ -120,6 +120,52 @@ h2 {
   background: #07100e;
 }
 
+.mission-panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: min(340px, calc(100% - 28px));
+  border: 1px solid rgba(111, 243, 164, 0.24);
+  background: rgba(9, 17, 15, 0.78);
+  padding: 14px;
+  backdrop-filter: blur(8px);
+}
+
+.mission-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.mission-panel h2 {
+  margin-bottom: 8px;
+}
+
+.wave-preview {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.wave-preview span,
+.wave-preview strong {
+  display: block;
+}
+
+.wave-preview span {
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wave-preview strong {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 canvas {
   display: block;
   width: 100%;
@@ -188,6 +234,19 @@ canvas {
   gap: 8px;
 }
 
+.combat-log {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.combat-log span {
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+}
+
 @media (max-width: 860px) {
   .command-bar,
   .hud {
@@ -197,5 +256,11 @@ canvas {
   .status-row {
     justify-content: flex-start;
   }
-}
 
+  .mission-panel {
+    position: static;
+    width: auto;
+    border-left: 0;
+    border-right: 0;
+  }
+}

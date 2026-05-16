@@ -22,6 +22,15 @@
 
     <section class="game-frame">
       <canvas id="game" width="1280" height="720" aria-label="Tower defense battlefield"></canvas>
+      <aside class="mission-panel">
+        <p class="eyebrow">Mission Briefing</p>
+        <h2 id="missionName">Operation Blackline</h2>
+        <p id="missionBriefing">Build a maze and hold the corridor.</p>
+        <div class="wave-preview">
+          <span id="waveName">Wave preview unavailable</span>
+          <strong id="waveComposition">No wave loaded</strong>
+        </div>
+      </aside>
       <div id="overlay" class="overlay">
         <div class="overlay-panel">
           <p class="eyebrow">WebGL-ready tactical prototype</p>
@@ -49,10 +58,11 @@
           <button id="sell" disabled>Sell</button>
           <button id="nextWave">Launch Wave</button>
         </div>
+        <div id="combatLog" class="combat-log"></div>
       </div>
     </section>
   </main>
+  <script src="data.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
-

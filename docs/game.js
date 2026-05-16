@@ -6,6 +6,11 @@ const ui = {
   base: document.getElementById("base"),
   wave: document.getElementById("wave"),
   selection: document.getElementById("selection"),
+  missionName: document.getElementById("missionName"),
+  missionBriefing: document.getElementById("missionBriefing"),
+  waveName: document.getElementById("waveName"),
+  waveComposition: document.getElementById("waveComposition"),
+  combatLog: document.getElementById("combatLog"),
   towerButtons: document.getElementById("towerButtons"),
   abilityButtons: document.getElementById("abilityButtons"),
   upgrade: document.getElementById("upgrade"),
@@ -15,105 +20,19 @@ const ui = {
   start: document.getElementById("start"),
 };
 
+const towerDefs = GAME_DATA.towers;
+const enemyDefs = GAME_DATA.enemies;
+const waves = GAME_DATA.waves;
+const abilityDefs = GAME_DATA.abilities;
 const grid = {
-  cols: 13,
-  rows: 9,
-  tileW: 72,
-  tileH: 36,
-  originX: 640,
-  originY: 118,
-  spawn: { x: 0, y: 4 },
-  base: { x: 12, y: 4 },
-  blocked: new Set(["5,1", "6,1", "7,1", "4,7", "5,7", "8,7", "9,7"]),
-};
-
-const towerDefs = {
-  rifle: {
-    name: "Rifle Turret",
-    cost: 90,
-    range: 2.7,
-    fireRate: 0.48,
-    damage: 18,
-    color: "#8fb0bb",
-    accent: "#e9f7ff",
-    text: "Fast single target",
-  },
-  missile: {
-    name: "Missile Battery",
-    cost: 150,
-    range: 3.1,
-    fireRate: 1.12,
-    damage: 34,
-    splash: 1.1,
-    color: "#b6a16b",
-    accent: "#ffcf5a",
-    text: "Splash damage",
-  },
-  railgun: {
-    name: "Railgun",
-    cost: 220,
-    range: 4.4,
-    fireRate: 1.8,
-    damage: 96,
-    pierce: true,
-    color: "#6c8df0",
-    accent: "#b4c8ff",
-    text: "Heavy line shot",
-  },
-  emp: {
-    name: "EMP Spire",
-    cost: 130,
-    range: 2.6,
-    fireRate: 1.35,
-    damage: 8,
-    slow: 0.42,
-    slowTime: 2.4,
-    color: "#6ff3d0",
-    accent: "#d6fff5",
-    text: "Slow support",
-  },
-  drone: {
-    name: "Drone Nest",
-    cost: 185,
-    range: 3.4,
-    fireRate: 0.92,
-    damage: 26,
-    homing: true,
-    color: "#c492ff",
-    accent: "#f0dcff",
-    text: "Flexible pursuit",
-  },
-};
-
-const enemyDefs = {
-  scout: { name: "Scout", hp: 70, speed: 1.55, reward: 16, color: "#ffcf5a", armor: 0 },
-  carrier: { name: "Armored Carrier", hp: 220, speed: 0.72, reward: 36, color: "#a8b1b6", armor: 6 },
-  shield: { name: "Shield Drone", hp: 125, speed: 1.0, reward: 28, color: "#80f6ff", armor: 2, shield: 55 },
-  swarm: { name: "Swarm Bot", hp: 44, speed: 1.35, reward: 10, color: "#ff9969", armor: 0 },
-  jammer: { name: "Jammer", hp: 150, speed: 0.95, reward: 34, color: "#de7dff", armor: 1, jammer: true },
-  boss: { name: "Siege Walker", hp: 1400, speed: 0.42, reward: 240, color: "#ff6f5f", armor: 10, boss: true },
-};
-
-const waves = [
-  [{ type: "scout", count: 8, gap: 0.75 }],
-  [{ type: "scout", count: 8, gap: 0.5 }, { type: "swarm", count: 10, gap: 0.32 }],
-  [{ type: "carrier", count: 5, gap: 0.9 }, { type: "shield", count: 3, gap: 0.85 }],
-  [{ type: "swarm", count: 20, gap: 0.22 }, { type: "jammer", count: 3, gap: 1.1 }],
-  [{ type: "carrier", count: 8, gap: 0.7 }, { type: "shield", count: 5, gap: 0.68 }],
-  [{ type: "scout", count: 14, gap: 0.38 }, { type: "jammer", count: 5, gap: 0.75 }, { type: "carrier", count: 6, gap: 0.75 }],
-  [{ type: "boss", count: 1, gap: 0.1 }, { type: "swarm", count: 18, gap: 0.26 }, { type: "shield", count: 6, gap: 0.6 }],
-];
-
-const abilityDefs = {
-  airstrike: { name: "Airstrike", cooldown: 18, radius: 1.35, damage: 180, color: "#ffcf5a", text: "Area burst" },
-  empPulse: { name: "EMP Pulse", cooldown: 15, radius: 1.7, damage: 30, slow: 0.25, slowTime: 4.5, color: "#6ff3d0", text: "Slow and shield break" },
-  repair: { name: "Emergency Repair", cooldown: 28, radius: 0, heal: 25, color: "#6ff3a4", text: "Restore base" },
+  ...GAME_DATA.grid,
+  blocked: new Set(GAME_DATA.grid.blocked),
 };
 
 const state = {
   started: false,
-  credits: 360,
-  base: 100,
+  credits: GAME_DATA.mission.startCredits,
+  base: GAME_DATA.mission.baseIntegrity,
   waveIndex: 0,
   waveActive: false,
   spawnQueue: [],
@@ -127,6 +46,7 @@ const state = {
   selectedTower: null,
   hoverCell: null,
   message: "Select a tower or commander ability.",
+  log: ["Mission systems online."],
   gameOver: false,
   victory: false,
   lastTime: 0,
@@ -255,6 +175,24 @@ function towerStats(tower) {
   };
 }
 
+function addLog(message) {
+  state.log.unshift(message);
+  state.log = state.log.slice(0, 5);
+}
+
+function setMessage(message, log = false) {
+  state.message = message;
+  if (log) addLog(message);
+}
+
+function describeWave(index) {
+  const wave = waves[index];
+  if (!wave) return "Mission complete";
+  return wave.groups
+    .map((group) => `${group.count} ${enemyDefs[group.type].name}`)
+    .join(" + ");
+}
+
 function spawnEnemy(type) {
   const def = enemyDefs[type];
   const path = currentPath();
@@ -277,15 +215,16 @@ function spawnEnemy(type) {
 
 function queueWave() {
   if (state.waveActive || state.gameOver || state.waveIndex >= waves.length) return;
+  const wave = waves[state.waveIndex];
   state.waveActive = true;
   state.spawnQueue = [];
-  waves[state.waveIndex].forEach((group) => {
+  wave.groups.forEach((group) => {
     for (let i = 0; i < group.count; i++) {
       state.spawnQueue.push({ type: group.type, delay: group.gap });
     }
   });
   state.spawnTimer = 0.35;
-  state.message = `Wave ${state.waveIndex + 1} inbound.`;
+  setMessage(`Wave ${state.waveIndex + 1}: ${wave.name} inbound.`, true);
 }
 
 function damageEnemy(enemy, amount, options = {}) {
@@ -357,12 +296,13 @@ function updateEnemies(dt, now) {
 
   if (state.waveActive && state.spawnQueue.length === 0 && state.enemies.length === 0) {
     state.waveActive = false;
+    const clearedWave = waves[state.waveIndex];
     state.waveIndex++;
-    state.credits += 80 + state.waveIndex * 20;
+    state.credits += clearedWave.reward;
     if (state.waveIndex >= waves.length) {
       endGame(true);
     } else {
-      state.message = `Wave cleared. Prepare for wave ${state.waveIndex + 1}.`;
+      setMessage(`Wave cleared. +${clearedWave.reward} credits. Prepare for wave ${state.waveIndex + 1}.`, true);
     }
   }
 }
@@ -452,21 +392,21 @@ function placeTower(cell) {
   if (!type || !cell) return;
   const def = towerDefs[type];
   if (state.credits < def.cost) {
-    state.message = "Insufficient credits.";
+    setMessage(`Insufficient credits. ${def.name} costs ${def.cost}.`, true);
     return;
   }
   if (!isBuildable(cell.x, cell.y)) {
-    state.message = "Cannot deploy there.";
+    setMessage("Cannot deploy there: tile is blocked, occupied, reserved, or under enemy movement.", true);
     return;
   }
   if (!findPath(cell)) {
-    state.message = "Placement rejected: convoy path must stay open.";
+    setMessage("Placement rejected: convoy path must stay open.", true);
     return;
   }
   state.towers.push(makeTower(type, cell.x, cell.y));
   state.credits -= def.cost;
   refreshEnemyPaths();
-  state.message = `${def.name} deployed.`;
+  setMessage(`${def.name} deployed.`, true);
 }
 
 function useAbility(cell) {
@@ -475,14 +415,14 @@ function useAbility(cell) {
   const ability = abilityDefs[key];
   const now = performance.now() / 1000;
   if (ability.readyAt && ability.readyAt > now) {
-    state.message = `${ability.name} cooling down.`;
+    setMessage(`${ability.name} cooling down.`, true);
     return;
   }
 
   if (key === "repair") {
-    state.base = Math.min(100, state.base + ability.heal);
+    state.base = Math.min(GAME_DATA.mission.baseIntegrity, state.base + ability.heal);
     ability.readyAt = now + ability.cooldown;
-    state.message = "Emergency repair completed.";
+    setMessage("Emergency repair completed.", true);
     addEffect(centerOf(grid.base).x, centerOf(grid.base).y, ability.color, 0.7, 70);
     return;
   }
@@ -497,7 +437,7 @@ function useAbility(cell) {
     }
   }
   ability.readyAt = now + ability.cooldown;
-  state.message = `${ability.name} executed.`;
+  setMessage(`${ability.name} executed.`, true);
   addEffect(hit.x, hit.y, ability.color, 0.65, ability.radius * grid.tileW);
 }
 
@@ -506,12 +446,12 @@ function upgradeSelected() {
   if (!tower || tower.level >= 3) return;
   const cost = Math.round(tower.def.cost * (0.72 + tower.level * 0.52));
   if (state.credits < cost) {
-    state.message = "Insufficient credits for upgrade.";
+    setMessage(`Insufficient credits. Upgrade costs ${cost}.`, true);
     return;
   }
   state.credits -= cost;
   tower.level++;
-  state.message = `${tower.def.name} upgraded to tier ${tower.level}.`;
+  setMessage(`${tower.def.name} upgraded to tier ${tower.level}.`, true);
 }
 
 function sellSelected() {
@@ -520,12 +460,13 @@ function sellSelected() {
   state.credits += Math.round(tower.def.cost * (0.5 + tower.level * 0.18));
   state.towers = state.towers.filter((item) => item !== tower);
   state.selectedTower = null;
-  state.message = "Tower sold.";
+  setMessage("Tower sold.", true);
 }
 
 function endGame(victory) {
   state.gameOver = true;
   state.victory = victory;
+  addLog(victory ? "Mission victory confirmed." : "Base integrity failed.");
   ui.overlay.classList.remove("hidden");
   ui.overlay.querySelector("h2").textContent = victory ? "Sector secured." : "Base overrun.";
   ui.overlay.querySelector("p").textContent = victory
@@ -537,8 +478,8 @@ function endGame(victory) {
 function restart() {
   Object.assign(state, {
     started: true,
-    credits: 360,
-    base: 100,
+    credits: GAME_DATA.mission.startCredits,
+    base: GAME_DATA.mission.baseIntegrity,
     waveIndex: 0,
     waveActive: false,
     spawnQueue: [],
@@ -552,6 +493,7 @@ function restart() {
     selectedTower: null,
     hoverCell: null,
     message: "Build a maze, then launch wave one.",
+    log: ["Mission started.", "Build phase active."],
     gameOver: false,
     victory: false,
     lastTime: performance.now(),
@@ -672,6 +614,14 @@ function updateUi() {
   ui.credits.textContent = `Credits ${state.credits}`;
   ui.base.textContent = `Base ${Math.max(0, Math.round(state.base))}`;
   ui.wave.textContent = `Wave ${Math.min(state.waveIndex + 1, waves.length)}/${waves.length}`;
+  ui.missionName.textContent = GAME_DATA.mission.name;
+  ui.missionBriefing.textContent = GAME_DATA.mission.briefing;
+  const nextWave = waves[state.waveIndex];
+  ui.waveName.textContent = nextWave
+    ? `${state.waveActive ? "Active" : "Next"} Wave ${state.waveIndex + 1}: ${nextWave.name}`
+    : "Mission complete";
+  ui.waveComposition.textContent = describeWave(state.waveIndex);
+  ui.combatLog.innerHTML = state.log.map((entry) => `<span>${entry}</span>`).join("");
   ui.selection.textContent = state.selectedTower
     ? `${state.selectedTower.def.name} tier ${state.selectedTower.level}. ${state.message}`
     : state.message;
@@ -719,7 +669,7 @@ function buildButtons() {
       state.selectedTowerType = state.selectedTowerType === key ? null : key;
       state.selectedAbility = null;
       state.selectedTower = null;
-      state.message = tower.text;
+      setMessage(`${tower.name}: ${tower.role || tower.text}`);
     });
     ui.towerButtons.appendChild(button);
   });
@@ -733,7 +683,7 @@ function buildButtons() {
       state.selectedAbility = state.selectedAbility === key ? null : key;
       state.selectedTowerType = null;
       state.selectedTower = null;
-      state.message = ability.text;
+      setMessage(`${ability.name}: ${ability.text}`);
     });
     ui.abilityButtons.appendChild(button);
   });
@@ -759,7 +709,7 @@ canvas.addEventListener("click", () => {
   }
   if (!cell) return;
   state.selectedTower = state.towers.find((tower) => tower.x === cell.x && tower.y === cell.y) || null;
-  state.message = state.selectedTower ? "Tower selected." : "Select a tower, ability, or occupied tile.";
+  setMessage(state.selectedTower ? "Tower selected." : "Select a tower, ability, or occupied tile.");
 });
 
 ui.start.addEventListener("click", restart);

@@ -4,6 +4,7 @@
 
 - `docs/index.html`: GitHub Pages entrypoint.
 - `docs/styles.css`: UI and page styling.
+- `docs/data.js`: Editable mission, grid, tower, enemy, wave, and ability definitions.
 - `docs/game.js`: Browser playable tower defense implementation.
 
 ## Unity Scaffold
@@ -16,4 +17,3 @@
 - `DesignDocs/GAME_DESIGN.md`: Gameplay design.
 - `DesignDocs/BUILD_AND_TEST.md`: Local and deployment checks.
 - `DesignDocs/TEST_PLAN.md`: Manual QA checklist.
-
