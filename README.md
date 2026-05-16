@@ -49,3 +49,16 @@ http://localhost:8080
 4. Push to GitHub.
 5. Verify the GitHub Pages URL loads and starts a mission.
 
+## Manual QA Checklist
+
+Before release, run through these browser checks:
+
+1. Start a mission and confirm the battlefield, HUD, and mission briefing fit on desktop and mobile widths.
+2. Select a tower and hover several tiles: valid, blocked, occupied, spawn/base, enemy-occupied, and path-breaking previews should be visually distinct.
+3. Build a legal maze, then confirm path-blocking placement is rejected.
+4. Select a tower, verify the stat panel, choose a branch upgrade, and confirm range, damage, fire rate, next cost, and sell value update.
+5. Launch each wave, confirm the countdown banner appears, and use pause/resume plus speed toggle during combat.
+6. Save, refresh, load, and confirm towers, enemies, credits, wave state, and cooldowns restore without crashing.
+7. Trigger base damage and confirm the red pulse appears.
+8. Finish both defeat and victory flows and confirm the mission summary is readable.
+9. Open `?debug=1` locally and confirm the debug credits, skip wave, and clear save buttons work.

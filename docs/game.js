@@ -1,3 +1,9 @@
+import { GAME_DATA } from "./data.js";
+import * as Core from "./modules/core.js";
+import * as Storage from "./modules/storage.js";
+import * as UiPanel from "./modules/ui.js";
+import { drawBattlefield } from "./modules/render.js";
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -31,44 +37,25 @@ const ui = {
   resultStats: document.getElementById("resultStats"),
   start: document.getElementById("start"),
   waveTraits: document.getElementById("waveTraits"),
+  towerDetails: document.getElementById("towerDetails"),
+  battleBanner: document.getElementById("battleBanner"),
+  pauseOverlay: document.getElementById("pauseOverlay"),
+  debugPanel: document.getElementById("debugPanel"),
+  debugCredits: document.getElementById("debugCredits"),
+  debugWave: document.getElementById("debugWave"),
+  debugSaveClear: document.getElementById("debugSaveClear"),
 };
 
 const towerDefs = GAME_DATA.towers;
 const enemyDefs = GAME_DATA.enemies;
 const waves = GAME_DATA.waves;
 const abilityDefs = GAME_DATA.abilities;
-const STORAGE_KEY = "iron-grid-defense-save-v2";
 const BASE_CANVAS_WIDTH = 1280;
 const BASE_CANVAS_HEIGHT = 860;
 const SPEED_STEPS = [1, 1.5, 2];
+const DEBUG_MODE = new URLSearchParams(window.location.search).get("debug") === "1";
 
-function expandRectCells(rects = []) {
-  const cells = [];
-  rects.forEach((rect) => {
-    for (let y = rect.y; y < rect.y + rect.h; y++) {
-      for (let x = rect.x; x < rect.x + rect.w; x++) {
-        cells.push(`${x},${y}`);
-      }
-    }
-  });
-  return cells;
-}
-
-const terrainCells = Object.fromEntries(
-  Object.entries(GAME_DATA.grid.terrain || {}).map(([key, cells]) => [key, [...cells]])
-);
-
-Object.entries(GAME_DATA.grid.terrainRects || {}).forEach(([key, rects]) => {
-  terrainCells[key] = [...(terrainCells[key] || []), ...expandRectCells(rects)];
-});
-
-const grid = {
-  ...GAME_DATA.grid,
-  blocked: new Set([...(GAME_DATA.grid.blocked || []), ...expandRectCells(GAME_DATA.grid.blockedRects)]),
-  terrain: Object.fromEntries(
-    Object.entries(terrainCells).map(([key, cells]) => [key, new Set(cells)])
-  ),
-};
+const grid = Core.createGrid(GAME_DATA.grid);
 
 function fitGridToCanvas() {
   const scale = Math.min(canvas.width / BASE_CANVAS_WIDTH, canvas.height / BASE_CANVAS_HEIGHT) || 1;
@@ -100,6 +87,7 @@ const state = {
   base: GAME_DATA.mission.baseIntegrity,
   waveIndex: 0,
   waveActive: false,
+  waveCountdown: 0,
   spawnQueue: [],
   spawnTimer: 0,
   towers: [],
@@ -117,15 +105,9 @@ const state = {
   victory: false,
   lastTime: 0,
   pauseStartedAt: 0,
-  stats: {
-    towersBuilt: 0,
-    towersSold: 0,
-    enemiesDestroyed: 0,
-    damageDealt: 0,
-    abilitiesUsed: 0,
-    wavesCleared: 0,
-    saves: 0,
-  },
+  basePulse: 0,
+  banner: { text: "", life: 0 },
+  stats: Core.createStats(),
 };
 
 const audio = {
@@ -355,172 +337,59 @@ function playMissionEnd(victory) {
 }
 
 function cellKey(x, y) {
-  return `${x},${y}`;
+  return Core.cellKey(x, y);
 }
 
 function centerOf(cell) {
-  return {
-    x: grid.originX + (cell.x - cell.y) * grid.tileW / 2,
-    y: grid.originY + (cell.x + cell.y) * grid.tileH / 2,
-  };
+  return Core.centerOf(grid, cell);
 }
 
 function screenToCell(mx, my) {
-  const dx = mx - grid.originX;
-  const dy = my - grid.originY;
-  const x = Math.floor(dy / grid.tileH + dx / grid.tileW);
-  const y = Math.floor(dy / grid.tileH - dx / grid.tileW);
-  if (x < 0 || y < 0 || x >= grid.cols || y >= grid.rows) return null;
-  return { x, y };
+  return Core.screenToCell(grid, mx, my);
 }
 
 function isOccupied(x, y, ignoreTower = null) {
-  return state.towers.some((tower) => tower !== ignoreTower && tower.x === x && tower.y === y);
+  return Core.isOccupied(state, x, y, ignoreTower);
 }
 
 function isEnemyOnCell(x, y) {
-  return state.enemies.some((enemy) => {
-    const cell = screenToCell(enemy.x, enemy.y);
-    return cell && cell.x === x && cell.y === y;
-  });
+  return Core.isEnemyOnCell(grid, state, x, y);
 }
 
 function isBuildable(x, y) {
-  if (x < 0 || y < 0 || x >= grid.cols || y >= grid.rows) return false;
-  if (cellKey(x, y) === cellKey(grid.spawn.x, grid.spawn.y)) return false;
-  if (cellKey(x, y) === cellKey(grid.base.x, grid.base.y)) return false;
-  if (grid.blocked.has(cellKey(x, y))) return false;
-  if (isEnemyOnCell(x, y)) return false;
-  return !isOccupied(x, y);
+  return Core.isBuildable(grid, state, x, y);
 }
 
 function findPathFrom(start, extraBlock = null) {
-  const goal = grid.base;
-  const open = [start];
-  const cameFrom = new Map();
-  const visited = new Set([cellKey(start.x, start.y)]);
-  const blocks = new Set([...grid.blocked]);
-
-  state.towers.forEach((tower) => blocks.add(cellKey(tower.x, tower.y)));
-  if (extraBlock) blocks.add(cellKey(extraBlock.x, extraBlock.y));
-
-  while (open.length) {
-    const current = open.shift();
-    if (current.x === goal.x && current.y === goal.y) {
-      const path = [goal];
-      let cursor = cellKey(goal.x, goal.y);
-      while (cameFrom.has(cursor)) {
-        const prev = cameFrom.get(cursor);
-        path.unshift(prev);
-        cursor = cellKey(prev.x, prev.y);
-      }
-      return path;
-    }
-
-    const neighbors = [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 },
-    ];
-
-    for (const next of neighbors) {
-      const key = cellKey(next.x, next.y);
-      if (next.x < 0 || next.y < 0 || next.x >= grid.cols || next.y >= grid.rows) continue;
-      if (blocks.has(key) && key !== cellKey(goal.x, goal.y)) continue;
-      if (visited.has(key)) continue;
-      visited.add(key);
-      cameFrom.set(key, current);
-      open.push(next);
-    }
-  }
-
-  return null;
+  return Core.findPathFrom(grid, state, start, extraBlock);
 }
 
 function findPath(extraBlock = null) {
-  return findPathFrom(grid.spawn, extraBlock);
+  return Core.findPath(grid, state, extraBlock);
 }
 
 function currentPath() {
-  return findPath() || [grid.spawn, grid.base];
+  return Core.currentPath(grid, state);
 }
 
 function refreshEnemyPaths() {
-  for (const enemy of state.enemies) {
-    const currentCell = screenToCell(enemy.x, enemy.y) || enemy.path[enemy.pathIndex] || grid.spawn;
-    const path = findPathFrom(currentCell);
-    if (path) {
-      enemy.path = path;
-      enemy.pathIndex = 0;
-    }
-  }
+  Core.refreshEnemyPaths(grid, state);
 }
 
 function makeTower(type, x, y) {
-  return {
-    type,
-    x,
-    y,
-    level: 1,
-    branch: null,
-    cooldown: 0,
-    def: towerDefs[type],
-  };
+  return Core.makeTower(towerDefs, type, x, y);
 }
 
 function branchData(tower) {
-  if (!tower.branch || !tower.def.branches) return null;
-  return tower.def.branches[tower.branch];
+  return Core.branchData(tower);
 }
 
 function branchTier(tower) {
-  const branch = branchData(tower);
-  if (!branch) return null;
-  return branch.tiers[Math.max(0, tower.level - 2)] || null;
+  return Core.branchTier(tower);
 }
 
 function towerUpgradeCost(tower, branchKey = tower.branch) {
-  if (tower.def.branches && tower.level === 1 && branchKey) {
-    return tower.def.branches[branchKey].tiers[0].cost;
-  }
-  if (tower.def.branches && tower.level === 2 && branchKey) {
-    return tower.def.branches[branchKey].tiers[1].cost;
-  }
-  return Math.round(tower.def.cost * (0.72 + tower.level * 0.52));
-}
-
-function towerUpgradeLabel(tower) {
-  if (tower.def.branches && tower.level === 1) return "Choose Branch";
-  if (tower.level === 2 && tower.branch) return "Upgrade Tier 3";
-  return "Upgrade";
-}
-
-function renderUpgradeChoices() {
-  ui.upgradeChoices.innerHTML = "";
-  const tower = state.selectedTower;
-  if (!tower || tower.level >= 3) return;
-
-  if (tower.def.branches && tower.level === 1) {
-    Object.entries(tower.def.branches).forEach(([key, branch]) => {
-      const button = document.createElement("button");
-      button.className = "upgrade-choice";
-      button.innerHTML = `<strong>${branch.name}</strong><span>${branch.tiers[0].cost} cr - ${branch.description}</span>`;
-      button.addEventListener("click", () => chooseBranchUpgrade(key));
-      ui.upgradeChoices.appendChild(button);
-    });
-    return;
-  }
-
-  const branch = branchData(tower);
-  if (branch) {
-    const info = document.createElement("button");
-    info.className = "upgrade-choice active";
-    const tier = branchTier(tower);
-    info.disabled = true;
-    info.innerHTML = `<strong>${branch.name}</strong><span>${tier ? `${towerUpgradeCost(tower)} cr - branch locked in.` : "Branch locked in."}</span>`;
-    ui.upgradeChoices.appendChild(info);
-  }
+  return Core.towerUpgradeCost(tower, branchKey);
 }
 
 function chooseBranchUpgrade(branchKey) {
@@ -544,38 +413,7 @@ function chooseBranchUpgrade(branchKey) {
 }
 
 function towerStats(tower) {
-  const scale = 1 + (tower.level - 1) * 0.34;
-  const tier = branchTier(tower);
-  const stats = {
-    range: tower.def.range + (tower.level - 1) * 0.22,
-    fireRate: Math.max(0.22, tower.def.fireRate * (1 - (tower.level - 1) * 0.12)),
-    damage: tower.def.damage * scale,
-    splash: tower.def.splash || 0,
-    slow: tower.def.slow,
-    slowTime: tower.def.slowTime,
-    pierce: tower.def.pierce,
-    homing: tower.def.homing,
-    armorPierce: 0,
-    bossMultiplier: 1,
-    breaksShield: false,
-    armorShred: 0,
-    color: tower.def.color,
-    accent: tower.def.accent,
-  };
-  if (!tier) return stats;
-
-  stats.range += tier.rangeBonus || 0;
-  stats.fireRate = Math.max(0.18, stats.fireRate * (tier.fireRateMultiplier || 1));
-  stats.damage *= tier.damageMultiplier || 1;
-  stats.splash += tier.splashBonus || 0;
-  stats.slow = tier.slowMultiplier ?? stats.slow;
-  stats.slowTime = (stats.slowTime || 0) + (tier.slowTimeBonus || 0);
-  stats.armorPierce = tier.armorPierce || 0;
-  stats.bossMultiplier = tier.bossMultiplier || 1;
-  stats.breaksShield = Boolean(tier.breaksShield);
-  stats.armorShred = tier.armorShred || 0;
-  stats.accent = branchData(tower).color || stats.accent;
-  return stats;
+  return Core.towerStats(tower);
 }
 
 function addLog(message) {
@@ -586,6 +424,10 @@ function addLog(message) {
 function setMessage(message, log = false) {
   state.message = message;
   if (log) addLog(message);
+}
+
+function showBanner(text, life = 1.8) {
+  state.banner = { text, life };
 }
 
 function describeWave(index) {
@@ -612,69 +454,19 @@ function describeWaveTraits(index) {
 }
 
 function snapshotAbilityCooldowns() {
-  const now = state.paused && state.pauseStartedAt ? state.pauseStartedAt : performance.now() / 1000;
-  return Object.fromEntries(
-    Object.entries(abilityDefs).map(([key, ability]) => [key, Math.max(0, (ability.readyAt || 0) - now)])
-  );
+  return Storage.snapshotAbilityCooldowns(state, abilityDefs);
 }
 
 function restoreAbilityCooldowns(cooldowns = {}) {
-  const now = performance.now() / 1000;
-  Object.entries(abilityDefs).forEach(([key, ability]) => {
-    const remaining = Number(cooldowns[key] || 0);
-    ability.readyAt = remaining > 0 ? now + remaining : 0;
-  });
+  Storage.restoreAbilityCooldowns(abilityDefs, cooldowns);
 }
 
 function saveGameState(manual = false) {
   if (!window.localStorage || !state.started) return false;
-  const saveStats = {
-    ...state.stats,
-    saves: manual ? state.stats.saves + 1 : state.stats.saves,
-  };
-  const payload = {
-    version: 2,
-    started: state.started,
-    paused: state.paused,
-    speedIndex: state.speedIndex,
-    credits: state.credits,
-    base: state.base,
-    waveIndex: state.waveIndex,
-    waveActive: state.waveActive,
-    spawnQueue: state.spawnQueue.map((item) => ({ ...item })),
-    spawnTimer: state.spawnTimer,
-    towers: state.towers.map((tower) => ({
-      type: tower.type,
-      x: tower.x,
-      y: tower.y,
-      level: tower.level,
-      branch: tower.branch,
-      cooldown: tower.cooldown,
-    })),
-    enemies: state.enemies.map((enemy) => ({
-      type: enemy.type,
-      hp: enemy.hp,
-      maxHp: enemy.maxHp,
-      shield: enemy.shield,
-      path: enemy.path.map((cell) => ({ x: cell.x, y: cell.y })),
-      pathIndex: enemy.pathIndex,
-      x: enemy.x,
-      y: enemy.y,
-      slowUntil: enemy.slowUntil,
-      slowMultiplier: enemy.slowMultiplier,
-      reached: enemy.reached,
-    })),
-    selectedTowerType: state.selectedTowerType,
-    selectedAbility: state.selectedAbility,
-    message: state.message,
-    log: state.log,
-    stats: saveStats,
-    cooldowns: snapshotAbilityCooldowns(),
-  };
-
+  const payload = Storage.serializeState(state, abilityDefs, manual);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    if (manual) state.stats.saves = saveStats.saves;
+    Storage.writeSavedGame(payload);
+    if (manual) state.stats.saves = payload.stats.saves;
     if (manual) setMessage("Mission saved.", true);
     return true;
   } catch {
@@ -684,31 +476,22 @@ function saveGameState(manual = false) {
 }
 
 function clearSavedGame() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Ignore storage failures.
-  }
+  Storage.clearSavedGame();
 }
 
 function hasSavedGame() {
-  try {
-    return Boolean(localStorage.getItem(STORAGE_KEY));
-  } catch {
-    return false;
-  }
+  return Storage.hasSavedGame();
 }
 
 function loadGameState(manual = false) {
   if (!window.localStorage) return false;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
+  const save = Storage.readSavedGame();
+  if (!save) {
     if (manual) setMessage("No saved mission found.", true);
     return false;
   }
 
   try {
-    const save = JSON.parse(raw);
     state.started = Boolean(save.started);
     state.paused = Boolean(save.paused);
     state.pauseStartedAt = state.paused ? performance.now() / 1000 : 0;
@@ -717,6 +500,7 @@ function loadGameState(manual = false) {
     state.base = Number(save.base) || GAME_DATA.mission.baseIntegrity;
     state.waveIndex = Number(save.waveIndex) || 0;
     state.waveActive = Boolean(save.waveActive);
+    state.waveCountdown = Number(save.waveCountdown) || 0;
     state.spawnQueue = Array.isArray(save.spawnQueue) ? save.spawnQueue.map((item) => ({ type: item.type, delay: Number(item.delay) || 0 })) : [];
     state.spawnTimer = Number(save.spawnTimer) || 0;
     state.towers = Array.isArray(save.towers)
@@ -756,6 +540,8 @@ function loadGameState(manual = false) {
     state.hoverCell = null;
     state.projectiles = [];
     state.effects = [];
+    state.basePulse = 0;
+    state.banner = { text: "", life: 0 };
     state.message = save.message || "Mission restored.";
     state.log = Array.isArray(save.log) && save.log.length ? save.log.slice(0, 5) : ["Mission restored."];
     state.gameOver = false;
@@ -809,14 +595,16 @@ function queueWave() {
   if (state.waveActive || state.gameOver || state.waveIndex >= waves.length) return;
   const wave = waves[state.waveIndex];
   state.waveActive = true;
+  state.waveCountdown = 2.2;
   state.spawnQueue = [];
   wave.groups.forEach((group) => {
     for (let i = 0; i < group.count; i++) {
       state.spawnQueue.push({ type: group.type, delay: group.gap });
     }
   });
-  state.spawnTimer = 0.35;
+  state.spawnTimer = 0.2;
   setMessage(`Wave ${state.waveIndex + 1}: ${wave.name} inbound.`, true);
+  showBanner(`Wave ${state.waveIndex + 1} inbound`);
   playWaveCue();
   saveGameState();
 }
@@ -850,6 +638,10 @@ function addEffect(x, y, color, life, radius) {
 
 function updateSpawning(dt) {
   if (!state.waveActive || state.spawnQueue.length === 0) return;
+  if (state.waveCountdown > 0) {
+    state.waveCountdown = Math.max(0, state.waveCountdown - dt);
+    return;
+  }
   state.spawnTimer -= dt;
   if (state.spawnTimer <= 0) {
     const next = state.spawnQueue.shift();
@@ -865,6 +657,7 @@ function updateEnemies(dt, now) {
       enemy.reached = true;
       state.base -= enemy.def.boss ? 35 : 8;
       enemy.dead = true;
+      state.basePulse = 1;
       addEffect(enemy.x, enemy.y, "#ff6f5f", 0.55, 44);
       playBaseHit();
       continue;
@@ -903,6 +696,7 @@ function updateEnemies(dt, now) {
       endGame(true);
     } else {
       setMessage(`Wave cleared. +${clearedWave.reward} credits. Prepare for wave ${state.waveIndex + 1}.`, true);
+      showBanner(`Wave cleared +${clearedWave.reward} credits`, 2.2);
     }
     saveGameState();
   }
@@ -1014,6 +808,8 @@ function updateProjectiles(dt) {
 function updateEffects(dt) {
   state.effects.forEach((effect) => effect.life -= dt);
   state.effects = state.effects.filter((effect) => effect.life > 0);
+  state.basePulse = Math.max(0, state.basePulse - dt * 2.4);
+  if (state.banner.life > 0) state.banner.life = Math.max(0, state.banner.life - dt);
 }
 
 function placeTower(cell) {
@@ -1022,6 +818,12 @@ function placeTower(cell) {
   const def = towerDefs[type];
   if (state.credits < def.cost) {
     setMessage(`Insufficient credits. ${def.name} costs ${def.cost}.`, true);
+    playDenied();
+    return;
+  }
+  const preview = Core.classifyBuildCell(grid, state, cell);
+  if (preview.type !== "valid") {
+    setMessage(`Cannot deploy there: ${preview.label}.`, true);
     playDenied();
     return;
   }
@@ -1093,7 +895,7 @@ function upgradeSelected() {
   if (tower.def.branches && tower.level === 1 && !tower.branch) {
     setMessage("Choose a branch upgrade from the panel below.", true);
     playUi();
-    renderUpgradeChoices();
+    UiPanel.renderUpgradeChoices(ui.upgradeChoices, tower, chooseBranchUpgrade);
     return;
   }
   if (state.credits < cost) {
@@ -1122,19 +924,11 @@ function sellSelected() {
 }
 
 function renderMissionSummary(victory) {
-  ui.resultStats.innerHTML = [
-    { label: "Waves cleared", value: `${state.stats.wavesCleared}/${waves.length}` },
-    { label: "Enemies destroyed", value: `${state.stats.enemiesDestroyed}` },
-    { label: "Damage dealt", value: `${Math.round(state.stats.damageDealt)}` },
-    { label: "Towers built", value: `${state.stats.towersBuilt}` },
-    { label: "Towers sold", value: `${state.stats.towersSold}` },
-    { label: "Abilities used", value: `${state.stats.abilitiesUsed}` },
-    { label: "Manual saves", value: `${state.stats.saves}` },
-  ].map((item) => `<div class="result-stat"><strong>${item.value}</strong><span>${item.label}</span></div>`).join("");
+  UiPanel.renderMissionSummary(ui.resultStats, state.stats, waves.length);
   ui.overlayTitle.textContent = victory ? "Sector secured." : "Base overrun.";
   ui.overlayText.textContent = victory
-    ? "The convoy held and the battlefield is secure. Restart to attempt a faster clear or try a different branch plan."
-    : "The line collapsed. Restart, rework the maze, and let the new tower branches do the heavy lifting.";
+    ? "The line held. Restart to chase a cleaner clear or try a different branch plan."
+    : "Base integrity failed. Restart with a tighter maze, stronger branch timing, and better anti-armor coverage.";
 }
 
 function endGame(victory) {
@@ -1157,6 +951,7 @@ function restart() {
     base: GAME_DATA.mission.baseIntegrity,
     waveIndex: 0,
     waveActive: false,
+    waveCountdown: 0,
     spawnQueue: [],
     spawnTimer: 0,
     towers: [],
@@ -1174,15 +969,9 @@ function restart() {
     victory: false,
     lastTime: performance.now(),
     pauseStartedAt: 0,
-    stats: {
-      towersBuilt: 0,
-      towersSold: 0,
-      enemiesDestroyed: 0,
-      damageDealt: 0,
-      abilitiesUsed: 0,
-      wavesCleared: 0,
-      saves: 0,
-    },
+    basePulse: 0,
+    banner: { text: "", life: 0 },
+    stats: Core.createStats(),
   });
   Object.values(abilityDefs).forEach((ability) => ability.readyAt = 0);
   ui.overlay.classList.add("hidden");
@@ -1193,175 +982,8 @@ function restart() {
   saveGameState();
 }
 
-function drawTile(cell, fill, stroke = "#2a4037") {
-  const p = centerOf(cell);
-  ctx.beginPath();
-  ctx.moveTo(p.x, p.y - grid.tileH / 2);
-  ctx.lineTo(p.x + grid.tileW / 2, p.y);
-  ctx.lineTo(p.x, p.y + grid.tileH / 2);
-  ctx.lineTo(p.x - grid.tileW / 2, p.y);
-  ctx.closePath();
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = stroke;
-  ctx.stroke();
-}
-
-function terrainHas(type, key) {
-  return grid.terrain[type] && grid.terrain[type].has(key);
-}
-
-function drawTerrainDetail(cell, key) {
-  const p = centerOf(cell);
-
-  if (terrainHas("runway", key)) {
-    ctx.strokeStyle = "rgba(143, 176, 187, 0.18)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(p.x - 18, p.y);
-    ctx.lineTo(p.x + 18, p.y);
-    ctx.stroke();
-  }
-
-  if (terrainHas("reinforced", key)) {
-    ctx.strokeStyle = "rgba(111, 243, 164, 0.45)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(p.x - 16, p.y - 10, 32, 20);
-  }
-
-  if (terrainHas("hazard", key)) {
-    ctx.fillStyle = "rgba(255, 207, 90, 0.2)";
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y - 10);
-    ctx.lineTo(p.x + 14, p.y + 8);
-    ctx.lineTo(p.x - 14, p.y + 8);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  if (terrainHas("relay", key)) {
-    ctx.strokeStyle = "rgba(111, 243, 208, 0.65)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y - 8, 9, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y - 1);
-    ctx.lineTo(p.x, p.y - 24);
-    ctx.stroke();
-  }
-}
-
-function drawBlockedDetail(cell, key) {
-  const p = centerOf(cell);
-  const blockW = Math.max(16, grid.tileW * 0.56);
-  const blockH = Math.max(12, grid.tileH * 0.85);
-  const capW = blockW * 0.55;
-  ctx.fillStyle = terrainHas("relay", key) ? "#102d2a" : "#111615";
-  ctx.fillRect(p.x - blockW / 2, p.y - blockH - 6, blockW, blockH + 6);
-  ctx.fillStyle = terrainHas("relay", key) ? "#6ff3d0" : "#53645e";
-  ctx.fillRect(p.x - capW / 2, p.y - blockH - 13, capW, 7);
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-  ctx.strokeRect(p.x - blockW / 2, p.y - blockH - 6, blockW, blockH + 6);
-}
-
-function drawTower(tower) {
-  const p = centerOf(tower);
-  const size = 18 + tower.level * 3;
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 9, 24, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = tower.def.color;
-  ctx.fillRect(p.x - size / 2, p.y - 26 - tower.level * 3, size, 26 + tower.level * 3);
-  ctx.fillStyle = tower.def.accent;
-  ctx.fillRect(p.x - 4, p.y - 44 - tower.level * 4, 8, 18);
-  ctx.fillStyle = "#09110f";
-  ctx.font = "700 12px Trebuchet MS";
-  ctx.textAlign = "center";
-  ctx.fillText(tower.level, p.x, p.y - 9);
-}
-
-function drawEnemy(enemy) {
-  const width = enemy.def.boss ? 44 : 26;
-  const height = enemy.def.boss ? 34 : 22;
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  ctx.beginPath();
-  ctx.ellipse(enemy.x, enemy.y + 10, width * 0.7, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = enemy.def.color;
-  ctx.fillRect(enemy.x - width / 2, enemy.y - height / 2, width, height);
-  if (enemy.shield > 0) {
-    ctx.strokeStyle = "#80f6ff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(enemy.x - width / 2 - 4, enemy.y - height / 2 - 4, width + 8, height + 8);
-  }
-  const hpPct = Math.max(0, enemy.hp / enemy.maxHp);
-  ctx.fillStyle = "#1d2624";
-  ctx.fillRect(enemy.x - width / 2, enemy.y - height / 2 - 9, width, 4);
-  ctx.fillStyle = hpPct > 0.4 ? "#6ff3a4" : "#ff6f5f";
-  ctx.fillRect(enemy.x - width / 2, enemy.y - height / 2 - 9, width * hpPct, 4);
-}
-
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grad.addColorStop(0, "#0b1714");
-  grad.addColorStop(1, "#14201c");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const path = currentPath();
-  const pathKeys = new Set(path.map((cell) => cellKey(cell.x, cell.y)));
-
-  for (let y = 0; y < grid.rows; y++) {
-    for (let x = 0; x < grid.cols; x++) {
-      const key = cellKey(x, y);
-      let fill = "#172520";
-      if (grid.blocked.has(key)) fill = "#0a0f0e";
-      if (terrainHas("hazard", key)) fill = "#2b291d";
-      if (terrainHas("reinforced", key)) fill = "#1d302a";
-      if (pathKeys.has(key)) fill = "#25362e";
-      if (terrainHas("runway", key) && pathKeys.has(key)) fill = "#2d3a34";
-      if (x === grid.spawn.x && y === grid.spawn.y) fill = "#394025";
-      if (x === grid.base.x && y === grid.base.y) fill = "#3d2523";
-      if (state.hoverCell && state.hoverCell.x === x && state.hoverCell.y === y) fill = state.selectedTowerType || state.selectedAbility ? "#335446" : "#263b34";
-      drawTile({ x, y }, fill);
-      drawTerrainDetail({ x, y }, key);
-      if (grid.blocked.has(key)) drawBlockedDetail({ x, y }, key);
-    }
-  }
-
-  for (const effect of state.effects) {
-    const pct = effect.life / effect.maxLife;
-    ctx.strokeStyle = effect.color;
-    ctx.globalAlpha = pct;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(effect.x, effect.y, effect.radius * (1.15 - pct * 0.35), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
-  state.towers.forEach(drawTower);
-
-  for (const p of state.projectiles) {
-    if (p.beam) {
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.tx, p.ty);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  state.enemies.forEach(drawEnemy);
+  drawBattlefield(ctx, canvas, grid, state);
 }
 
 function updateUi() {
@@ -1377,14 +999,12 @@ function updateUi() {
   ui.waveComposition.textContent = describeWave(state.waveIndex);
   ui.waveTraits.textContent = describeWaveTraits(state.waveIndex);
   ui.combatLog.innerHTML = state.log.map((entry) => `<span>${entry}</span>`).join("");
-  const selectedBranchName = state.selectedTower?.branch
-    ? towerDefs[state.selectedTower.type]?.branches?.[state.selectedTower.branch]?.name || ""
-    : "";
   ui.selection.textContent = state.selectedTower
-    ? `${state.selectedTower.def.name} tier ${state.selectedTower.level}${selectedBranchName ? ` (${selectedBranchName})` : ""}. ${state.message}`
+    ? UiPanel.selectedTowerText(state.selectedTower, state.message)
     : state.message;
+  UiPanel.renderTowerDetails(ui.towerDetails, state.selectedTower);
   ui.upgrade.disabled = !state.selectedTower || state.selectedTower.level >= 3;
-  ui.upgrade.textContent = state.selectedTower ? towerUpgradeLabel(state.selectedTower) : "Upgrade";
+  ui.upgrade.textContent = state.selectedTower ? UiPanel.towerUpgradeLabel(state.selectedTower) : "Upgrade";
   ui.sell.disabled = !state.selectedTower;
   ui.nextWave.disabled = state.waveActive || state.gameOver || !state.started || state.paused;
   ui.pauseToggle.disabled = !state.started || state.gameOver;
@@ -1393,6 +1013,11 @@ function updateUi() {
   ui.speedToggle.textContent = `Speed x${SPEED_STEPS[state.speedIndex] || 1}`;
   ui.saveGame.disabled = !state.started || state.gameOver;
   ui.loadGame.disabled = !hasSavedGame();
+  ui.pauseOverlay.classList.toggle("hidden", !state.paused || state.gameOver);
+  ui.battleBanner.textContent = state.waveCountdown > 0
+    ? `Wave starts in ${Math.ceil(state.waveCountdown)}`
+    : state.banner.text;
+  ui.battleBanner.classList.toggle("visible", state.waveCountdown > 0 || state.banner.life > 0);
 
   document.querySelectorAll("[data-tower]").forEach((button) => {
     button.classList.toggle("active", button.dataset.tower === state.selectedTowerType);
@@ -1410,7 +1035,7 @@ function updateUi() {
     : "none";
   if (state.upgradeKey !== upgradeKey) {
     state.upgradeKey = upgradeKey;
-    renderUpgradeChoices();
+    UiPanel.renderUpgradeChoices(ui.upgradeChoices, state.selectedTower, chooseBranchUpgrade);
   }
 }
 
@@ -1548,6 +1173,26 @@ ui.loadGame.addEventListener("click", () => {
   ensureAudio();
   loadGameState(true);
 });
+ui.debugCredits.addEventListener("click", () => {
+  if (!DEBUG_MODE) return;
+  state.credits += 500;
+  setMessage("Debug credits added.", true);
+});
+ui.debugWave.addEventListener("click", () => {
+  if (!DEBUG_MODE || !state.started || state.gameOver) return;
+  state.spawnQueue = [];
+  state.enemies = [];
+  state.waveActive = false;
+  state.waveCountdown = 0;
+  state.waveIndex = Math.min(waves.length - 1, state.waveIndex + 1);
+  showBanner("Debug wave skip", 1.4);
+  setMessage("Debug wave skip applied.", true);
+});
+ui.debugSaveClear.addEventListener("click", () => {
+  if (!DEBUG_MODE) return;
+  clearSavedGame();
+  setMessage("Debug save cleared.", true);
+});
 ui.soundToggle.addEventListener("click", () => {
   ensureAudio();
   playTestSound();
@@ -1570,5 +1215,6 @@ window.addEventListener("beforeunload", () => {
 
 buildButtons();
 setVolume(ui.volume.value);
+ui.debugPanel.hidden = !DEBUG_MODE;
 loadGameState(false);
 requestAnimationFrame(tick);

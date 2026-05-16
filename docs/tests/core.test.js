@@ -1,0 +1,91 @@
+import { GAME_DATA } from "../data.js";
+import {
+  classifyBuildCell,
+  createGrid,
+  createStats,
+  findPath,
+  makeTower,
+  towerStats,
+  towerUpgradeCost,
+} from "../modules/core.js";
+import { migrateSave, serializeState } from "../modules/storage.js";
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function baseState() {
+  return {
+    started: true,
+    paused: false,
+    speedIndex: 0,
+    credits: GAME_DATA.mission.startCredits,
+    base: GAME_DATA.mission.baseIntegrity,
+    waveIndex: 0,
+    waveActive: false,
+    waveCountdown: 0,
+    spawnQueue: [],
+    spawnTimer: 0,
+    towers: [],
+    enemies: [],
+    selectedTowerType: "rifle",
+    selectedAbility: null,
+    selectedTower: null,
+    hoverCell: null,
+    message: "",
+    log: [],
+    gameOver: false,
+    victory: false,
+    lastTime: 0,
+    pauseStartedAt: 0,
+    basePulse: 0,
+    banner: { text: "", life: 0 },
+    stats: createStats(),
+  };
+}
+
+const grid = createGrid(GAME_DATA.grid);
+
+{
+  const state = baseState();
+  assert(findPath(grid, state)?.length > 0, "default map should have a valid convoy path");
+}
+
+{
+  const state = baseState();
+  assert(classifyBuildCell(grid, state, grid.spawn).type === "reserved", "spawn tile should be reserved");
+  assert(classifyBuildCell(grid, state, { x: 5, y: 3 }).type === "blocked", "blocked terrain should reject builds");
+  assert(classifyBuildCell(grid, state, { x: 2, y: 12 }).type === "valid", "open terrain should allow builds");
+}
+
+{
+  const state = baseState();
+  state.towers.push(makeTower(GAME_DATA.towers, "rifle", 2, 12));
+  assert(classifyBuildCell(grid, state, { x: 2, y: 12 }).type === "occupied", "occupied tile should reject builds");
+}
+
+{
+  const tower = makeTower(GAME_DATA.towers, "missile", 4, 14);
+  assert(towerUpgradeCost(tower, "cluster") === GAME_DATA.towers.missile.branches.cluster.tiers[0].cost, "branch cost should come from data");
+  tower.branch = "cluster";
+  tower.level = 2;
+  const stats = towerStats(tower);
+  assert(stats.splash > GAME_DATA.towers.missile.splash, "cluster branch should improve splash");
+}
+
+{
+  const state = baseState();
+  state.towers.push(makeTower(GAME_DATA.towers, "rifle", 2, 12));
+  const payload = serializeState(state, GAME_DATA.abilities, true);
+  assert(payload.version === 3, "new saves should use version 3");
+  assert(payload.stats.saves === 1, "manual save should increment save count in payload");
+}
+
+{
+  const migrated = migrateSave({ version: 2, started: true, stats: { towersBuilt: 1 } });
+  assert(migrated.version === 3, "v2 saves should migrate to v3");
+  assert(migrated.waveCountdown === 0, "migrated saves should default wave countdown");
+  assert(migrated.stats.towersBuilt === 1, "migrated saves should preserve stats");
+}
+
+console.log("core tests passed");

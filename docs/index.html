@@ -44,6 +44,13 @@
       </aside>
       <div class="game-frame">
         <canvas id="game" width="1280" height="860" aria-label="Tower defense battlefield"></canvas>
+        <div id="battleBanner" class="battle-banner" aria-live="polite"></div>
+        <div id="pauseOverlay" class="pause-overlay hidden">
+          <div>
+            <p class="eyebrow">Paused</p>
+            <h2>Orders held.</h2>
+          </div>
+        </div>
         <div id="overlay" class="overlay">
           <div class="overlay-panel">
             <p class="eyebrow">WebGL-ready tactical prototype</p>
@@ -68,6 +75,7 @@
       <div class="orders">
         <h2>Selection</h2>
         <p id="selection">Select a tower or commander ability.</p>
+        <div id="towerDetails" class="tower-details" aria-live="polite"></div>
         <div class="order-buttons">
           <button id="upgrade" disabled>Upgrade</button>
           <button id="sell" disabled>Sell</button>
@@ -77,8 +85,12 @@
         <div id="combatLog" class="combat-log"></div>
       </div>
     </section>
+    <section id="debugPanel" class="debug-panel" hidden>
+      <button id="debugCredits">+500 Credits</button>
+      <button id="debugWave">Skip Wave</button>
+      <button id="debugSaveClear">Clear Save</button>
+    </section>
   </main>
-  <script src="data.js"></script>
-  <script src="game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
