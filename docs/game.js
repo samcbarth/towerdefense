@@ -803,7 +803,7 @@ function updateTowers(dt) {
         breaksShield: stats.breaksShield,
         armorShred: stats.armorShred,
       });
-      state.projectiles.push({ x: origin.x, y: origin.y - 34, tx: target.x, ty: target.y, life: 0.16, color: stats.accent, beam: true });
+      state.projectiles.push({ x: origin.x, y: origin.y - 34, tx: target.x, ty: target.y, life: 0.16, color: stats.accent, beam: true, kind: tower.type });
       addEffect(target.x, target.y, stats.accent, 0.2, 16);
       playFire(tower.type);
       playImpact(target.def.boss);
@@ -822,6 +822,7 @@ function updateTowers(dt) {
         breaksShield: stats.breaksShield,
         armorShred: stats.armorShred,
         color: stats.accent,
+        kind: tower.type,
       });
       playFire(tower.type);
     }
