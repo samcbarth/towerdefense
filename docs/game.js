@@ -931,9 +931,26 @@ function renderMissionSummary(victory) {
     : "Base integrity failed. Restart with a tighter maze, stronger branch timing, and better anti-armor coverage.";
 }
 
+function resetMissionChrome() {
+  ui.pauseOverlay.classList.add("hidden");
+  ui.battleBanner.classList.remove("visible");
+  ui.battleBanner.textContent = "";
+  ui.resultStats.innerHTML = "";
+  ui.towerDetails.innerHTML = "";
+  ui.upgradeChoices.innerHTML = "";
+  ui.overlayTitle.textContent = "Hold the corridor.";
+  ui.overlayText.textContent = "Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.";
+}
+
 function endGame(victory) {
   state.gameOver = true;
   state.victory = victory;
+  state.paused = false;
+  state.waveActive = false;
+  state.waveCountdown = 0;
+  state.spawnQueue = [];
+  state.spawnTimer = 0;
+  state.banner = { text: "", life: 0 };
   addLog(victory ? "Mission victory confirmed." : "Base integrity failed.");
   playMissionEnd(victory);
   renderMissionSummary(victory);
@@ -943,6 +960,7 @@ function endGame(victory) {
 }
 
 function restart() {
+  clearSavedGame();
   Object.assign(state, {
     started: true,
     paused: false,
@@ -974,11 +992,11 @@ function restart() {
     stats: Core.createStats(),
   });
   Object.values(abilityDefs).forEach((ability) => ability.readyAt = 0);
+  resetMissionChrome();
   ui.overlay.classList.add("hidden");
-  ui.overlayTitle.textContent = "Hold the corridor.";
-  ui.overlayText.textContent = "Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.";
-  ui.resultStats.innerHTML = "";
   ui.start.textContent = "Start Mission";
+  updateUi();
+  draw();
   saveGameState();
 }
 

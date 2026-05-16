@@ -4,14 +4,16 @@ A fresh military-future 2.5D tower defense project designed for Unity + C# produ
 
 ## Live Build
 
-The playable browser build lives in `/docs` so GitHub Pages can serve it from the `main` branch.
+The recommended public URL is the baseline GitHub Pages repository URL, not a visible `/docs` redirect. Keep the Pages source set to `/docs` so GitHub serves the game at the clean repo URL, for example `https://<user>.github.io/<repo>/`.
+
+The root `index.html` also loads the same `/docs` assets directly as a safety fallback. If Pages is accidentally pointed at the repo root, players still get the game instead of being bounced to `/docs/`.
 
 After pushing to GitHub:
 1. Open the repository settings.
 2. Go to Pages.
 3. Set source to `Deploy from a branch`.
 4. Select branch `main` and folder `/docs`.
-5. Open the published Pages URL.
+5. Open the published Pages URL and confirm it stays on the baseline repo URL while loading the game.
 
 ## Current Playable
 
@@ -39,6 +41,18 @@ Then open:
 
 ```txt
 http://localhost:8080
+```
+
+To test the root fallback shell:
+
+```powershell
+python -m http.server 8081
+```
+
+Then open:
+
+```txt
+http://localhost:8081
 ```
 
 ## Manual Release Flow

@@ -2,15 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=docs/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Iron Grid Defense</title>
-  <script>
-    window.location.replace("docs/");
-  </script>
+  <link rel="stylesheet" href="docs/styles.css">
 </head>
 <body>
-  <p>Loading <a href="docs/">Iron Grid Defense</a>...</p>
+  <main class="shell">
+    <section class="command-bar">
+      <div>
+        <p class="eyebrow">Operation Blackline</p>
+        <h1>Iron Grid Defense</h1>
+      </div>
+      <div class="status-row">
+        <span id="credits">Credits 0</span>
+        <span id="base">Base 100</span>
+        <span id="wave">Wave 0/0</span>
+        <button id="soundToggle" class="sound-toggle">Test Sound</button>
+        <button id="muteToggle" class="sound-toggle">Mute</button>
+        <button id="pauseToggle" class="sound-toggle">Pause</button>
+        <button id="speedToggle" class="sound-toggle">Speed x1</button>
+        <button id="saveGame" class="sound-toggle">Save</button>
+        <button id="loadGame" class="sound-toggle">Load</button>
+        <span id="audioStatus" class="audio-status">Audio idle</span>
+        <label class="volume-control" for="volume">
+          <span>Vol</span>
+          <input id="volume" type="range" min="0" max="100" value="70">
+        </label>
+      </div>
+    </section>
+
+    <section class="battlefield-layout">
+      <aside class="mission-panel">
+        <p class="eyebrow">Mission Briefing</p>
+        <h2 id="missionName">Operation Blackline</h2>
+        <p id="missionBriefing">Build a maze and hold the corridor.</p>
+        <div class="wave-preview">
+          <span id="waveName">Wave preview unavailable</span>
+          <strong id="waveComposition">No wave loaded</strong>
+          <span id="waveTraits" class="wave-traits">No enemy traits loaded</span>
+        </div>
+      </aside>
+      <div class="game-frame">
+        <canvas id="game" width="1280" height="860" aria-label="Tower defense battlefield"></canvas>
+        <div id="battleBanner" class="battle-banner" aria-live="polite"></div>
+        <div id="pauseOverlay" class="pause-overlay hidden">
+          <div>
+            <p class="eyebrow">Paused</p>
+            <h2>Orders held.</h2>
+          </div>
+        </div>
+        <div id="overlay" class="overlay">
+          <div class="overlay-panel">
+            <p class="eyebrow">WebGL-ready tactical prototype</p>
+            <h2 id="overlayTitle">Hold the corridor.</h2>
+            <p id="overlayText">Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.</p>
+            <div id="resultStats" class="result-stats" aria-live="polite"></div>
+            <button id="start">Start Mission</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hud">
+      <div>
+        <h2>Towers</h2>
+        <div id="towerButtons" class="button-grid"></div>
+      </div>
+      <div>
+        <h2>Commander</h2>
+        <div id="abilityButtons" class="button-grid"></div>
+      </div>
+      <div class="orders">
+        <h2>Selection</h2>
+        <p id="selection">Select a tower or commander ability.</p>
+        <div id="towerDetails" class="tower-details" aria-live="polite"></div>
+        <div class="order-buttons">
+          <button id="upgrade" disabled>Upgrade</button>
+          <button id="sell" disabled>Sell</button>
+          <button id="nextWave">Launch Wave</button>
+        </div>
+        <div id="upgradeChoices" class="upgrade-choices"></div>
+        <div id="combatLog" class="combat-log"></div>
+      </div>
+    </section>
+    <section id="debugPanel" class="debug-panel" hidden>
+      <button id="debugCredits">+500 Credits</button>
+      <button id="debugWave">Skip Wave</button>
+      <button id="debugSaveClear">Clear Save</button>
+    </section>
+  </main>
+  <script type="module" src="docs/game.js"></script>
 </body>
 </html>
-
