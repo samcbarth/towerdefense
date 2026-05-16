@@ -27,6 +27,7 @@ const ui = {
   speedToggle: document.getElementById("speedToggle"),
   saveGame: document.getElementById("saveGame"),
   loadGame: document.getElementById("loadGame"),
+  resetGame: document.getElementById("resetGame"),
   soundToggle: document.getElementById("soundToggle"),
   muteToggle: document.getElementById("muteToggle"),
   audioStatus: document.getElementById("audioStatus"),
@@ -1026,6 +1027,48 @@ function resetMissionChrome() {
   ui.overlayText.textContent = "Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.";
 }
 
+function showStartOverlay(message = "New mission ready. Choose a challenge mode, then start when you are ready.") {
+  clearSavedGame();
+  Object.assign(state, {
+    started: false,
+    paused: false,
+    speedIndex: 0,
+    credits: startingCredits(),
+    base: GAME_DATA.mission.baseIntegrity,
+    waveIndex: 0,
+    waveActive: false,
+    waveCountdown: 0,
+    spawnQueue: [],
+    spawnTimer: 0,
+    towers: [],
+    enemies: [],
+    projectiles: [],
+    effects: [],
+    selectedTowerType: null,
+    selectedAbility: null,
+    selectedTower: null,
+    hoverCell: null,
+    upgradeKey: "",
+    message,
+    log: ["Mission reset."],
+    gameOver: false,
+    victory: false,
+    lastTime: performance.now(),
+    pauseStartedAt: 0,
+    basePulse: 0,
+    screenShake: 0,
+    banner: { text: "", life: 0 },
+    stats: Core.createStats(),
+  });
+  Object.values(abilityDefs).forEach((ability) => ability.readyAt = 0);
+  resetMissionChrome();
+  ui.overlay.classList.remove("hidden");
+  ui.start.textContent = "Start Mission";
+  state.upgradeKey = "";
+  updateUi();
+  draw();
+}
+
 function endGame(victory) {
   state.gameOver = true;
   state.victory = victory;
@@ -1116,6 +1159,7 @@ function updateUi() {
   ui.speedToggle.textContent = `Speed x${SPEED_STEPS[state.speedIndex] || 1}`;
   ui.saveGame.disabled = !state.started || state.gameOver;
   ui.loadGame.disabled = !hasSavedGame();
+  ui.resetGame.disabled = false;
   ui.pauseOverlay.classList.toggle("hidden", !state.paused || state.gameOver);
   ui.battleBanner.textContent = state.waveCountdown > 0
     ? `Wave starts in ${Math.ceil(state.waveCountdown)}`
@@ -1293,6 +1337,11 @@ ui.saveGame.addEventListener("click", () => {
 ui.loadGame.addEventListener("click", () => {
   ensureAudio();
   loadGameState(true);
+});
+ui.resetGame.addEventListener("click", () => {
+  ensureAudio();
+  playUi();
+  showStartOverlay();
 });
 ui.debugCredits.addEventListener("click", () => {
   if (!DEBUG_MODE) return;
