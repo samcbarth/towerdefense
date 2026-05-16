@@ -1191,8 +1191,10 @@ function updateUi() {
   ui.saveGame.disabled = !state.started || state.gameOver;
   ui.loadGame.disabled = !hasSavedGame();
   ui.resetGame.disabled = false;
-  ui.artTheme.textContent = ART_THEME_LABELS[state.artTheme] || ART_THEME_LABELS.sprites;
-  ui.artTheme.classList.toggle("active", state.artTheme === "sprites");
+  if (ui.artTheme) {
+    ui.artTheme.textContent = ART_THEME_LABELS[state.artTheme] || ART_THEME_LABELS.sprites;
+    ui.artTheme.classList.toggle("active", state.artTheme === "sprites");
+  }
   ui.pauseOverlay.classList.toggle("hidden", !state.paused || state.gameOver);
   ui.battleBanner.textContent = state.waveCountdown > 0
     ? `Wave starts in ${Math.ceil(state.waveCountdown)}`
@@ -1376,11 +1378,13 @@ ui.resetGame.addEventListener("click", () => {
   playUi();
   hardResetMission();
 });
-ui.artTheme.addEventListener("click", () => {
-  ensureAudio();
-  playUi();
-  applyArtTheme(state.artTheme === "sprites" ? "classic" : "sprites");
-});
+if (ui.artTheme) {
+  ui.artTheme.addEventListener("click", () => {
+    ensureAudio();
+    playUi();
+    applyArtTheme(state.artTheme === "sprites" ? "classic" : "sprites");
+  });
+}
 ui.debugCredits.addEventListener("click", () => {
   if (!DEBUG_MODE) return;
   state.credits += 500;
