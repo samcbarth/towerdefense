@@ -484,7 +484,11 @@ function applyArtTheme(theme, options = {}) {
   state.artTheme = theme === "classic" ? "classic" : "sprites";
   setArtTheme(state.artTheme);
   if (persist) Storage.writeArtTheme(state.artTheme);
-  if (!silent) setMessage(`Art theme set to ${state.artTheme === "classic" ? "Classic" : "Sprites"}.`, true);
+  if (!silent) {
+    const label = state.artTheme === "classic" ? "Classic" : "Sprites";
+    setMessage(`Art theme set to ${label}.`, true);
+    showBanner(`${label} render mode`, 1.5);
+  }
   if (save && state.started && !state.gameOver) saveGameState();
   updateUi();
   draw();

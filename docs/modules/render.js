@@ -1,5 +1,5 @@
 import { cellKey, centerOf, classifyBuildCell, currentPath, terrainHas, towerStats } from "./core.js";
-import { drawEnemySprite, drawProjectileSprite, drawTowerSprite, hasEnemySprite, hasProjectileSprite, hasTowerSprite } from "./assets.js";
+import { drawEnemySprite, drawProjectileSprite, drawTowerSprite, getArtTheme, hasEnemySprite, hasProjectileSprite, hasTowerSprite } from "./assets.js";
 
 function drawTile(ctx, grid, cell, fill, stroke = "#2a4037") {
   const p = centerOf(grid, cell);
@@ -15,6 +15,44 @@ function drawTile(ctx, grid, cell, fill, stroke = "#2a4037") {
   ctx.stroke();
 }
 
+function renderTheme() {
+  return getArtTheme() === "classic"
+    ? {
+        backgroundTop: "#0b1714",
+        backgroundBottom: "#14201c",
+        tileStroke: "#2a4037",
+        defaultFill: "#172520",
+        blockedFill: "#0a0f0e",
+        hazardFill: "#2b291d",
+        reinforcedFill: "#1d302a",
+        pathFill: "#25362e",
+        runwayPathFill: "#2d3a34",
+        spawnFill: "#394025",
+        baseFill: "#3d2523",
+        runwayLine: "rgba(143, 176, 187, 0.18)",
+        reinforcedStroke: "rgba(111, 243, 164, 0.45)",
+        hazardOverlay: "rgba(255, 207, 90, 0.2)",
+        relayStroke: "rgba(111, 243, 208, 0.65)",
+      }
+    : {
+        backgroundTop: "#102018",
+        backgroundBottom: "#1e3126",
+        tileStroke: "#4f6a58",
+        defaultFill: "#3ac36b",
+        blockedFill: "#8b6e56",
+        hazardFill: "#b5844b",
+        reinforcedFill: "#7acb88",
+        pathFill: "#c1844a",
+        runwayPathFill: "#c9925a",
+        spawnFill: "#5bd18c",
+        baseFill: "#ead8aa",
+        runwayLine: "rgba(248, 238, 200, 0.22)",
+        reinforcedStroke: "rgba(232, 245, 206, 0.5)",
+        hazardOverlay: "rgba(122, 72, 22, 0.22)",
+        relayStroke: "rgba(145, 255, 198, 0.78)",
+      };
+}
+
 function polygon(ctx, points) {
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
@@ -23,10 +61,11 @@ function polygon(ctx, points) {
 }
 
 function drawTerrainDetail(ctx, grid, cell, key) {
+  const theme = renderTheme();
   const p = centerOf(grid, cell);
 
   if (terrainHas(grid, "runway", key)) {
-    ctx.strokeStyle = "rgba(143, 176, 187, 0.18)";
+    ctx.strokeStyle = theme.runwayLine;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(p.x - 18, p.y);
@@ -35,13 +74,13 @@ function drawTerrainDetail(ctx, grid, cell, key) {
   }
 
   if (terrainHas(grid, "reinforced", key)) {
-    ctx.strokeStyle = "rgba(111, 243, 164, 0.45)";
+    ctx.strokeStyle = theme.reinforcedStroke;
     ctx.lineWidth = 2;
     ctx.strokeRect(p.x - 16, p.y - 10, 32, 20);
   }
 
   if (terrainHas(grid, "hazard", key)) {
-    ctx.fillStyle = "rgba(255, 207, 90, 0.2)";
+    ctx.fillStyle = theme.hazardOverlay;
     polygon(ctx, [
       { x: p.x, y: p.y - 10 },
       { x: p.x + 14, y: p.y + 8 },
@@ -51,7 +90,7 @@ function drawTerrainDetail(ctx, grid, cell, key) {
   }
 
   if (terrainHas(grid, "relay", key)) {
-    ctx.strokeStyle = "rgba(111, 243, 208, 0.65)";
+    ctx.strokeStyle = theme.relayStroke;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(p.x, p.y - 8, 9, 0, Math.PI * 2);
@@ -675,6 +714,7 @@ function drawProjectile(ctx, p) {
 
 export function drawBattlefield(ctx, canvas, grid, state) {
   const now = performance.now();
+  const theme = renderTheme();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   if (state.screenShake > 0) {
@@ -682,8 +722,8 @@ export function drawBattlefield(ctx, canvas, grid, state) {
     ctx.translate(Math.sin(state.screenShake * 57) * shake, Math.cos(state.screenShake * 43) * shake);
   }
   const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grad.addColorStop(0, "#0b1714");
-  grad.addColorStop(1, "#14201c");
+  grad.addColorStop(0, theme.backgroundTop);
+  grad.addColorStop(1, theme.backgroundBottom);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -693,18 +733,18 @@ export function drawBattlefield(ctx, canvas, grid, state) {
   for (let y = 0; y < grid.rows; y++) {
     for (let x = 0; x < grid.cols; x++) {
       const key = cellKey(x, y);
-      let fill = "#172520";
-      if (grid.blocked.has(key)) fill = "#0a0f0e";
-      if (terrainHas(grid, "hazard", key)) fill = "#2b291d";
-      if (terrainHas(grid, "reinforced", key)) fill = "#1d302a";
-      if (pathKeys.has(key)) fill = "#25362e";
-      if (terrainHas(grid, "runway", key) && pathKeys.has(key)) fill = "#2d3a34";
-      if (x === grid.spawn.x && y === grid.spawn.y) fill = "#394025";
-      if (x === grid.base.x && y === grid.base.y) fill = "#3d2523";
+      let fill = theme.defaultFill;
+      if (grid.blocked.has(key)) fill = theme.blockedFill;
+      if (terrainHas(grid, "hazard", key)) fill = theme.hazardFill;
+      if (terrainHas(grid, "reinforced", key)) fill = theme.reinforcedFill;
+      if (pathKeys.has(key)) fill = theme.pathFill;
+      if (terrainHas(grid, "runway", key) && pathKeys.has(key)) fill = theme.runwayPathFill;
+      if (x === grid.spawn.x && y === grid.spawn.y) fill = theme.spawnFill;
+      if (x === grid.base.x && y === grid.base.y) fill = theme.baseFill;
       if (state.hoverCell && state.hoverCell.x === x && state.hoverCell.y === y) {
         fill = hoverFill(grid, state, { x, y }, fill);
       }
-      drawTile(ctx, grid, { x, y }, fill);
+      drawTile(ctx, grid, { x, y }, fill, theme.tileStroke);
       drawTerrainDetail(ctx, grid, { x, y }, key);
       if (grid.blocked.has(key)) drawBlockedDetail(ctx, grid, { x, y }, key);
     }
