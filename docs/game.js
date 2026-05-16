@@ -16,6 +16,8 @@ const ui = {
   upgrade: document.getElementById("upgrade"),
   sell: document.getElementById("sell"),
   nextWave: document.getElementById("nextWave"),
+  soundToggle: document.getElementById("soundToggle"),
+  volume: document.getElementById("volume"),
   overlay: document.getElementById("overlay"),
   start: document.getElementById("start"),
 };
@@ -51,6 +53,153 @@ const state = {
   victory: false,
   lastTime: 0,
 };
+
+const audio = {
+  context: null,
+  master: null,
+  muted: false,
+  volume: 0.48,
+  lastFireAt: 0,
+  lastImpactAt: 0,
+};
+
+function ensureAudio() {
+  if (audio.context) {
+    if (audio.context.state === "suspended") audio.context.resume();
+    return true;
+  }
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) {
+    ui.soundToggle.textContent = "No Audio";
+    ui.soundToggle.disabled = true;
+    return false;
+  }
+
+  audio.context = new AudioContext();
+  audio.master = audio.context.createGain();
+  audio.master.gain.value = audio.muted ? 0 : audio.volume;
+  audio.master.connect(audio.context.destination);
+  return true;
+}
+
+function setVolume(value) {
+  audio.volume = Number(value) / 100;
+  if (audio.master) audio.master.gain.value = audio.muted ? 0 : audio.volume;
+}
+
+function setMuted(muted) {
+  audio.muted = muted;
+  if (audio.master) audio.master.gain.value = muted ? 0 : audio.volume;
+  ui.soundToggle.textContent = muted ? "Sound Off" : "Sound On";
+}
+
+function playTone({ frequency = 440, duration = 0.12, type = "sine", gain = 0.08, slideTo = null, delay = 0 }) {
+  if (audio.muted || !ensureAudio()) return;
+  const now = audio.context.currentTime + delay;
+  const osc = audio.context.createOscillator();
+  const amp = audio.context.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, now);
+  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+  amp.gain.setValueAtTime(0.0001, now);
+  amp.gain.exponentialRampToValueAtTime(gain, now + 0.012);
+  amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(amp);
+  amp.connect(audio.master);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function playNoise({ duration = 0.12, gain = 0.05, filter = 900, delay = 0 }) {
+  if (audio.muted || !ensureAudio()) return;
+  const now = audio.context.currentTime + delay;
+  const sampleRate = audio.context.sampleRate;
+  const buffer = audio.context.createBuffer(1, Math.max(1, sampleRate * duration), sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const source = audio.context.createBufferSource();
+  const amp = audio.context.createGain();
+  const band = audio.context.createBiquadFilter();
+  band.type = "lowpass";
+  band.frequency.value = filter;
+  amp.gain.setValueAtTime(gain, now);
+  amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  source.buffer = buffer;
+  source.connect(band);
+  band.connect(amp);
+  amp.connect(audio.master);
+  source.start(now);
+}
+
+function playUi() {
+  playTone({ frequency: 740, slideTo: 980, duration: 0.055, type: "triangle", gain: 0.035 });
+}
+
+function playDenied() {
+  playTone({ frequency: 170, slideTo: 105, duration: 0.16, type: "sawtooth", gain: 0.045 });
+}
+
+function playDeploy() {
+  playTone({ frequency: 260, slideTo: 420, duration: 0.12, type: "square", gain: 0.04 });
+  playNoise({ duration: 0.09, gain: 0.025, filter: 700, delay: 0.04 });
+}
+
+function playWaveCue() {
+  playTone({ frequency: 196, duration: 0.16, type: "sawtooth", gain: 0.05 });
+  playTone({ frequency: 294, duration: 0.16, type: "sawtooth", gain: 0.045, delay: 0.14 });
+  playTone({ frequency: 392, duration: 0.22, type: "sawtooth", gain: 0.04, delay: 0.28 });
+}
+
+function playFire(type) {
+  const now = performance.now();
+  if (now - audio.lastFireAt < 38) return;
+  audio.lastFireAt = now;
+  const profiles = {
+    rifle: { frequency: 760, slideTo: 300, duration: 0.045, type: "square", gain: 0.018 },
+    missile: { frequency: 130, slideTo: 82, duration: 0.13, type: "sawtooth", gain: 0.028 },
+    railgun: { frequency: 980, slideTo: 1700, duration: 0.11, type: "sawtooth", gain: 0.032 },
+    emp: { frequency: 420, slideTo: 250, duration: 0.16, type: "sine", gain: 0.026 },
+    drone: { frequency: 520, slideTo: 720, duration: 0.075, type: "triangle", gain: 0.021 },
+  };
+  playTone(profiles[type] || profiles.rifle);
+}
+
+function playImpact(strong = false) {
+  const now = performance.now();
+  if (now - audio.lastImpactAt < 42) return;
+  audio.lastImpactAt = now;
+  playNoise({ duration: strong ? 0.18 : 0.08, gain: strong ? 0.052 : 0.026, filter: strong ? 520 : 1100 });
+}
+
+function playAbility(key) {
+  if (key === "airstrike") {
+    playTone({ frequency: 220, slideTo: 92, duration: 0.28, type: "sawtooth", gain: 0.055 });
+    playNoise({ duration: 0.3, gain: 0.065, filter: 620, delay: 0.08 });
+  } else if (key === "empPulse") {
+    playTone({ frequency: 880, slideTo: 180, duration: 0.32, type: "sine", gain: 0.05 });
+    playTone({ frequency: 1320, slideTo: 240, duration: 0.28, type: "triangle", gain: 0.032, delay: 0.04 });
+  } else {
+    playTone({ frequency: 330, slideTo: 660, duration: 0.18, type: "triangle", gain: 0.045 });
+    playTone({ frequency: 660, slideTo: 990, duration: 0.16, type: "sine", gain: 0.03, delay: 0.12 });
+  }
+}
+
+function playBaseHit() {
+  playTone({ frequency: 92, slideTo: 58, duration: 0.34, type: "sawtooth", gain: 0.06 });
+  playNoise({ duration: 0.2, gain: 0.045, filter: 420 });
+}
+
+function playMissionEnd(victory) {
+  if (victory) {
+    playTone({ frequency: 330, duration: 0.16, type: "triangle", gain: 0.05 });
+    playTone({ frequency: 495, duration: 0.16, type: "triangle", gain: 0.045, delay: 0.16 });
+    playTone({ frequency: 660, duration: 0.36, type: "triangle", gain: 0.042, delay: 0.32 });
+  } else {
+    playTone({ frequency: 220, slideTo: 82, duration: 0.48, type: "sawtooth", gain: 0.055 });
+    playNoise({ duration: 0.35, gain: 0.04, filter: 360, delay: 0.08 });
+  }
+}
 
 function cellKey(x, y) {
   return `${x},${y}`;
@@ -225,6 +374,7 @@ function queueWave() {
   });
   state.spawnTimer = 0.35;
   setMessage(`Wave ${state.waveIndex + 1}: ${wave.name} inbound.`, true);
+  playWaveCue();
 }
 
 function damageEnemy(enemy, amount, options = {}) {
@@ -268,6 +418,7 @@ function updateEnemies(dt, now) {
       state.base -= enemy.def.boss ? 35 : 8;
       enemy.dead = true;
       addEffect(enemy.x, enemy.y, "#ff6f5f", 0.55, 44);
+      playBaseHit();
       continue;
     }
 
@@ -333,6 +484,8 @@ function updateTowers(dt) {
       damageEnemy(target, stats.damage);
       state.projectiles.push({ x: origin.x, y: origin.y - 34, tx: target.x, ty: target.y, life: 0.16, color: tower.def.accent, beam: true });
       addEffect(target.x, target.y, tower.def.accent, 0.2, 16);
+      playFire(tower.type);
+      playImpact(target.def.boss);
     } else {
       state.projectiles.push({
         x: origin.x,
@@ -345,6 +498,7 @@ function updateTowers(dt) {
         slowTime: tower.def.slowTime,
         color: tower.def.accent,
       });
+      playFire(tower.type);
     }
   }
 }
@@ -369,9 +523,11 @@ function updateProjectiles(dt) {
           if (splashDist <= p.splash) damageEnemy(enemy, p.damage * (1 - splashDist / (p.splash + 0.1)));
         }
         addEffect(p.target.x, p.target.y, p.color, 0.35, 42);
+        playImpact(true);
       } else {
         damageEnemy(p.target, p.damage, { slow: p.slow, slowTime: p.slowTime });
         addEffect(p.target.x, p.target.y, p.color, 0.22, 18);
+        playImpact(p.target.def.boss);
       }
       p.dead = true;
     } else {
@@ -393,20 +549,24 @@ function placeTower(cell) {
   const def = towerDefs[type];
   if (state.credits < def.cost) {
     setMessage(`Insufficient credits. ${def.name} costs ${def.cost}.`, true);
+    playDenied();
     return;
   }
   if (!isBuildable(cell.x, cell.y)) {
     setMessage("Cannot deploy there: tile is blocked, occupied, reserved, or under enemy movement.", true);
+    playDenied();
     return;
   }
   if (!findPath(cell)) {
     setMessage("Placement rejected: convoy path must stay open.", true);
+    playDenied();
     return;
   }
   state.towers.push(makeTower(type, cell.x, cell.y));
   state.credits -= def.cost;
   refreshEnemyPaths();
   setMessage(`${def.name} deployed.`, true);
+  playDeploy();
 }
 
 function useAbility(cell) {
@@ -416,6 +576,7 @@ function useAbility(cell) {
   const now = performance.now() / 1000;
   if (ability.readyAt && ability.readyAt > now) {
     setMessage(`${ability.name} cooling down.`, true);
+    playDenied();
     return;
   }
 
@@ -424,10 +585,14 @@ function useAbility(cell) {
     ability.readyAt = now + ability.cooldown;
     setMessage("Emergency repair completed.", true);
     addEffect(centerOf(grid.base).x, centerOf(grid.base).y, ability.color, 0.7, 70);
+    playAbility(key);
     return;
   }
 
-  if (!cell) return;
+  if (!cell) {
+    playDenied();
+    return;
+  }
   const hit = centerOf(cell);
   for (const enemy of state.enemies) {
     const dist = Math.hypot(enemy.x - hit.x, enemy.y - hit.y) / grid.tileW;
@@ -439,6 +604,7 @@ function useAbility(cell) {
   ability.readyAt = now + ability.cooldown;
   setMessage(`${ability.name} executed.`, true);
   addEffect(hit.x, hit.y, ability.color, 0.65, ability.radius * grid.tileW);
+  playAbility(key);
 }
 
 function upgradeSelected() {
@@ -447,11 +613,13 @@ function upgradeSelected() {
   const cost = Math.round(tower.def.cost * (0.72 + tower.level * 0.52));
   if (state.credits < cost) {
     setMessage(`Insufficient credits. Upgrade costs ${cost}.`, true);
+    playDenied();
     return;
   }
   state.credits -= cost;
   tower.level++;
   setMessage(`${tower.def.name} upgraded to tier ${tower.level}.`, true);
+  playDeploy();
 }
 
 function sellSelected() {
@@ -461,12 +629,14 @@ function sellSelected() {
   state.towers = state.towers.filter((item) => item !== tower);
   state.selectedTower = null;
   setMessage("Tower sold.", true);
+  playUi();
 }
 
 function endGame(victory) {
   state.gameOver = true;
   state.victory = victory;
   addLog(victory ? "Mission victory confirmed." : "Base integrity failed.");
+  playMissionEnd(victory);
   ui.overlay.classList.remove("hidden");
   ui.overlay.querySelector("h2").textContent = victory ? "Sector secured." : "Base overrun.";
   ui.overlay.querySelector("p").textContent = victory
@@ -666,6 +836,8 @@ function buildButtons() {
     button.dataset.tower = key;
     button.innerHTML = `${tower.name}<span>${tower.cost} cr - ${tower.text}</span>`;
     button.addEventListener("click", () => {
+      ensureAudio();
+      playUi();
       state.selectedTowerType = state.selectedTowerType === key ? null : key;
       state.selectedAbility = null;
       state.selectedTower = null;
@@ -680,6 +852,8 @@ function buildButtons() {
     button.dataset.ability = key;
     button.innerHTML = `${ability.name}<span>${ability.text}</span>`;
     button.addEventListener("click", () => {
+      ensureAudio();
+      playUi();
       state.selectedAbility = state.selectedAbility === key ? null : key;
       state.selectedTowerType = null;
       state.selectedTower = null;
@@ -697,6 +871,7 @@ canvas.addEventListener("mousemove", (event) => {
 });
 
 canvas.addEventListener("click", () => {
+  ensureAudio();
   if (!state.started || state.gameOver) return;
   const cell = state.hoverCell;
   if (state.selectedTowerType) {
@@ -710,12 +885,36 @@ canvas.addEventListener("click", () => {
   if (!cell) return;
   state.selectedTower = state.towers.find((tower) => tower.x === cell.x && tower.y === cell.y) || null;
   setMessage(state.selectedTower ? "Tower selected." : "Select a tower, ability, or occupied tile.");
+  playUi();
 });
 
-ui.start.addEventListener("click", restart);
-ui.nextWave.addEventListener("click", queueWave);
-ui.upgrade.addEventListener("click", upgradeSelected);
-ui.sell.addEventListener("click", sellSelected);
+ui.start.addEventListener("click", () => {
+  ensureAudio();
+  playUi();
+  restart();
+});
+ui.nextWave.addEventListener("click", () => {
+  ensureAudio();
+  queueWave();
+});
+ui.upgrade.addEventListener("click", () => {
+  ensureAudio();
+  upgradeSelected();
+});
+ui.sell.addEventListener("click", () => {
+  ensureAudio();
+  sellSelected();
+});
+ui.soundToggle.addEventListener("click", () => {
+  ensureAudio();
+  setMuted(!audio.muted);
+  if (!audio.muted) playUi();
+});
+ui.volume.addEventListener("input", () => {
+  ensureAudio();
+  setVolume(ui.volume.value);
+});
 
 buildButtons();
+setVolume(ui.volume.value);
 requestAnimationFrame(tick);

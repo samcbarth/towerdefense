@@ -114,6 +114,31 @@ h2 {
   font-weight: 800;
 }
 
+.sound-toggle {
+  min-width: 104px;
+  text-align: center;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 150px;
+  border: 1px solid var(--line);
+  background: #0d1714;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.volume-control input {
+  width: 84px;
+  accent-color: var(--accent);
+}
+
 .game-frame {
   position: relative;
   border: 1px solid var(--line);

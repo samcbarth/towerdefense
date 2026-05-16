@@ -17,3 +17,4 @@
 - `DesignDocs/GAME_DESIGN.md`: Gameplay design.
 - `DesignDocs/BUILD_AND_TEST.md`: Local and deployment checks.
 - `DesignDocs/TEST_PLAN.md`: Manual QA checklist.
+- `DesignDocs/SOUND_DESIGN.md`: Audio direction and cue rules.
