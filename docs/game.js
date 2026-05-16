@@ -17,6 +17,7 @@ const ui = {
   sell: document.getElementById("sell"),
   nextWave: document.getElementById("nextWave"),
   soundToggle: document.getElementById("soundToggle"),
+  muteToggle: document.getElementById("muteToggle"),
   volume: document.getElementById("volume"),
   overlay: document.getElementById("overlay"),
   start: document.getElementById("start"),
@@ -58,14 +59,16 @@ const audio = {
   context: null,
   master: null,
   muted: false,
-  volume: 0.48,
+  volume: 0.7,
   lastFireAt: 0,
   lastImpactAt: 0,
 };
 
 function ensureAudio() {
   if (audio.context) {
-    if (audio.context.state === "suspended") audio.context.resume();
+    if (audio.context.state === "suspended") {
+      audio.context.resume().catch(() => {});
+    }
     return true;
   }
 
@@ -73,6 +76,7 @@ function ensureAudio() {
   if (!AudioContext) {
     ui.soundToggle.textContent = "No Audio";
     ui.soundToggle.disabled = true;
+    ui.muteToggle.disabled = true;
     return false;
   }
 
@@ -80,6 +84,7 @@ function ensureAudio() {
   audio.master = audio.context.createGain();
   audio.master.gain.value = audio.muted ? 0 : audio.volume;
   audio.master.connect(audio.context.destination);
+  audio.context.resume().catch(() => {});
   return true;
 }
 
@@ -91,7 +96,7 @@ function setVolume(value) {
 function setMuted(muted) {
   audio.muted = muted;
   if (audio.master) audio.master.gain.value = muted ? 0 : audio.volume;
-  ui.soundToggle.textContent = muted ? "Sound Off" : "Sound On";
+  ui.muteToggle.textContent = muted ? "Unmute" : "Mute";
 }
 
 function playTone({ frequency = 440, duration = 0.12, type = "sine", gain = 0.08, slideTo = null, delay = 0 }) {
@@ -133,16 +138,16 @@ function playNoise({ duration = 0.12, gain = 0.05, filter = 900, delay = 0 }) {
 }
 
 function playUi() {
-  playTone({ frequency: 740, slideTo: 980, duration: 0.055, type: "triangle", gain: 0.035 });
+  playTone({ frequency: 740, slideTo: 980, duration: 0.07, type: "triangle", gain: 0.07 });
 }
 
 function playDenied() {
-  playTone({ frequency: 170, slideTo: 105, duration: 0.16, type: "sawtooth", gain: 0.045 });
+  playTone({ frequency: 170, slideTo: 105, duration: 0.18, type: "sawtooth", gain: 0.08 });
 }
 
 function playDeploy() {
-  playTone({ frequency: 260, slideTo: 420, duration: 0.12, type: "square", gain: 0.04 });
-  playNoise({ duration: 0.09, gain: 0.025, filter: 700, delay: 0.04 });
+  playTone({ frequency: 260, slideTo: 420, duration: 0.14, type: "square", gain: 0.075 });
+  playNoise({ duration: 0.1, gain: 0.045, filter: 700, delay: 0.04 });
 }
 
 function playWaveCue() {
@@ -183,6 +188,14 @@ function playAbility(key) {
     playTone({ frequency: 330, slideTo: 660, duration: 0.18, type: "triangle", gain: 0.045 });
     playTone({ frequency: 660, slideTo: 990, duration: 0.16, type: "sine", gain: 0.03, delay: 0.12 });
   }
+}
+
+function playTestSound() {
+  setMuted(false);
+  playTone({ frequency: 330, duration: 0.13, type: "triangle", gain: 0.08 });
+  playTone({ frequency: 550, duration: 0.13, type: "triangle", gain: 0.075, delay: 0.12 });
+  playTone({ frequency: 825, duration: 0.22, type: "triangle", gain: 0.07, delay: 0.24 });
+  playNoise({ duration: 0.09, gain: 0.035, filter: 1400, delay: 0.42 });
 }
 
 function playBaseHit() {
@@ -907,12 +920,17 @@ ui.sell.addEventListener("click", () => {
 });
 ui.soundToggle.addEventListener("click", () => {
   ensureAudio();
+  playTestSound();
+});
+ui.muteToggle.addEventListener("click", () => {
+  ensureAudio();
   setMuted(!audio.muted);
-  if (!audio.muted) playUi();
+  if (!audio.muted) playTestSound();
 });
 ui.volume.addEventListener("input", () => {
   ensureAudio();
   setVolume(ui.volume.value);
+  if (!audio.muted) playUi();
 });
 
 buildButtons();
