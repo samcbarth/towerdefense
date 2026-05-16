@@ -2,20 +2,36 @@ const GAME_DATA = {
   mission: {
     name: "Operation Blackline",
     subtitle: "Military-future WebGL tower defense prototype",
-    briefing: "Enemy armor is advancing through the grid corridor. Build a legal maze, preserve one route, and stop the Siege Walker before it reaches the base.",
-    startCredits: 360,
+    briefing: "Enemy armor is advancing across the Blackline depot. Build a legal maze around hangars, relay blocks, and fortified corridors while preserving one route to the base.",
+    startCredits: 440,
     baseIntegrity: 100,
   },
   grid: {
-    cols: 13,
-    rows: 9,
-    tileW: 72,
-    tileH: 36,
+    cols: 17,
+    rows: 11,
+    tileW: 62,
+    tileH: 31,
     originX: 640,
-    originY: 118,
-    spawn: { x: 0, y: 4 },
-    base: { x: 12, y: 4 },
-    blocked: ["5,1", "6,1", "7,1", "4,7", "5,7", "8,7", "9,7"],
+    originY: 72,
+    spawn: { x: 0, y: 5 },
+    base: { x: 16, y: 5 },
+    blocked: [
+      "4,1", "5,1", "6,1", "11,1", "12,1",
+      "3,2", "6,2", "10,2", "13,2",
+      "7,3", "8,3", "12,3",
+      "2,4", "5,4", "14,4",
+      "8,5", "9,5",
+      "2,6", "5,6", "14,6",
+      "7,7", "8,7", "12,7",
+      "3,8", "6,8", "10,8", "13,8",
+      "4,9", "5,9", "6,9", "11,9", "12,9"
+    ],
+    terrain: {
+      reinforced: ["1,5", "15,5", "15,4", "15,6"],
+      hazard: ["8,4", "9,4", "8,6", "9,6"],
+      relay: ["4,1", "12,1", "4,9", "12,9"],
+      runway: ["0,5", "1,5", "2,5", "3,5", "4,5", "5,5", "6,5", "7,5", "10,5", "11,5", "12,5", "13,5", "14,5", "15,5", "16,5"],
+    },
   },
   towers: {
     rifle: {
@@ -102,4 +118,3 @@ const GAME_DATA = {
     repair: { name: "Emergency Repair", cooldown: 28, radius: 0, heal: 25, color: "#6ff3a4", text: "Restore base" },
   },
 };
-

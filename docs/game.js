@@ -31,6 +31,9 @@ const abilityDefs = GAME_DATA.abilities;
 const grid = {
   ...GAME_DATA.grid,
   blocked: new Set(GAME_DATA.grid.blocked),
+  terrain: Object.fromEntries(
+    Object.entries(GAME_DATA.grid.terrain || {}).map(([key, cells]) => [key, new Set(cells)])
+  ),
 };
 
 const state = {
@@ -767,6 +770,61 @@ function drawTile(cell, fill, stroke = "#2a4037") {
   ctx.stroke();
 }
 
+function terrainHas(type, key) {
+  return grid.terrain[type] && grid.terrain[type].has(key);
+}
+
+function drawTerrainDetail(cell, key) {
+  const p = centerOf(cell);
+
+  if (terrainHas("runway", key)) {
+    ctx.strokeStyle = "rgba(143, 176, 187, 0.18)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x - 18, p.y);
+    ctx.lineTo(p.x + 18, p.y);
+    ctx.stroke();
+  }
+
+  if (terrainHas("reinforced", key)) {
+    ctx.strokeStyle = "rgba(111, 243, 164, 0.45)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(p.x - 16, p.y - 10, 32, 20);
+  }
+
+  if (terrainHas("hazard", key)) {
+    ctx.fillStyle = "rgba(255, 207, 90, 0.2)";
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 10);
+    ctx.lineTo(p.x + 14, p.y + 8);
+    ctx.lineTo(p.x - 14, p.y + 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (terrainHas("relay", key)) {
+    ctx.strokeStyle = "rgba(111, 243, 208, 0.65)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 8, 9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 1);
+    ctx.lineTo(p.x, p.y - 24);
+    ctx.stroke();
+  }
+}
+
+function drawBlockedDetail(cell, key) {
+  const p = centerOf(cell);
+  ctx.fillStyle = terrainHas("relay", key) ? "#102d2a" : "#111615";
+  ctx.fillRect(p.x - 18, p.y - 18, 36, 26);
+  ctx.fillStyle = terrainHas("relay", key) ? "#6ff3d0" : "#53645e";
+  ctx.fillRect(p.x - 10, p.y - 27, 20, 9);
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+  ctx.strokeRect(p.x - 18, p.y - 18, 36, 26);
+}
+
 function drawTower(tower) {
   const p = centerOf(tower);
   const size = 18 + tower.level * 3;
@@ -821,11 +879,16 @@ function draw() {
       const key = cellKey(x, y);
       let fill = "#172520";
       if (grid.blocked.has(key)) fill = "#0a0f0e";
+      if (terrainHas("hazard", key)) fill = "#2b291d";
+      if (terrainHas("reinforced", key)) fill = "#1d302a";
       if (pathKeys.has(key)) fill = "#25362e";
+      if (terrainHas("runway", key) && pathKeys.has(key)) fill = "#2d3a34";
       if (x === grid.spawn.x && y === grid.spawn.y) fill = "#394025";
       if (x === grid.base.x && y === grid.base.y) fill = "#3d2523";
       if (state.hoverCell && state.hoverCell.x === x && state.hoverCell.y === y) fill = state.selectedTowerType || state.selectedAbility ? "#335446" : "#263b34";
       drawTile({ x, y }, fill);
+      drawTerrainDetail({ x, y }, key);
+      if (grid.blocked.has(key)) drawBlockedDetail({ x, y }, key);
     }
   }
 
