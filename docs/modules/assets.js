@@ -1,5 +1,7 @@
 let artManifest = null;
 const spriteCache = new Map();
+const ART_THEME_SET = new Set(["sprites", "classic"]);
+let artTheme = "sprites";
 
 function cacheKey(group, type, variant = "base") {
   return `${group}:${type}:${variant}`;
@@ -61,6 +63,19 @@ export function loadGameAssets(art = {}) {
   return Promise.all(collectManifestEntries(art).map(([key, descriptor]) => ensureSpriteLoaded(key, descriptor)));
 }
 
+export function normalizeArtTheme(theme) {
+  if (theme === "auto") return "sprites";
+  return ART_THEME_SET.has(theme) ? theme : "sprites";
+}
+
+export function setArtTheme(theme) {
+  artTheme = normalizeArtTheme(theme);
+}
+
+export function getArtTheme() {
+  return artTheme;
+}
+
 function getRecord(key) {
   return spriteCache.get(key) || null;
 }
@@ -93,15 +108,15 @@ function projectileRecord(type) {
 }
 
 export function hasTowerSprite(tower) {
-  return Boolean(towerRecord(tower.type, tower.branch)?.ready);
+  return artTheme !== "classic" && Boolean(towerRecord(tower.type, tower.branch)?.ready);
 }
 
 export function hasEnemySprite(enemy) {
-  return Boolean(enemyRecord(enemy.type)?.ready);
+  return artTheme !== "classic" && Boolean(enemyRecord(enemy.type)?.ready);
 }
 
 export function hasProjectileSprite(kind) {
-  return Boolean(projectileRecord(kind)?.ready);
+  return artTheme !== "classic" && Boolean(projectileRecord(kind)?.ready);
 }
 
 function drawRecord(ctx, record, x, y, descriptor, scale = 1) {

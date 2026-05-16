@@ -237,11 +237,60 @@ function drawTowerLevel(ctx, p, tower) {
   ctx.fillText(tower.level, p.x, p.y - 6);
 }
 
+function drawTowerSpriteEnhancement(ctx, p, tower, stats, now, scale) {
+  const branchColor = towerBranchColor(tower, stats);
+
+  if (tower.type === "railgun") {
+    ctx.strokeStyle = branchColor;
+    ctx.lineWidth = tower.branch === "overcharge" ? 3 : 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 12 * scale);
+    ctx.lineTo(p.x, p.y - 30 * scale);
+    ctx.stroke();
+    ctx.globalAlpha = 0.28 + (Math.sin(now * 0.008 + tower.x) + 1) * 0.08;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 34 * scale, 6 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  if (tower.type === "emp") {
+    const radius = tower.branch === "freeze" ? 15 : 12;
+    ctx.strokeStyle = branchColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 12 * scale, radius * scale + Math.sin(now * 0.008 + tower.y) * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    if (tower.branch === "breaker") {
+      ctx.strokeStyle = "#fff4aa";
+      ctx.beginPath();
+      ctx.moveTo(p.x - 8 * scale, p.y - 12 * scale);
+      ctx.lineTo(p.x + 8 * scale, p.y - 12 * scale);
+      ctx.moveTo(p.x, p.y - 20 * scale);
+      ctx.lineTo(p.x, p.y - 4 * scale);
+      ctx.stroke();
+    }
+  }
+
+  if (tower.type === "drone") {
+    ctx.fillStyle = branchColor;
+    const orbit = now * 0.006;
+    const radius = tower.branch === "hunter" ? 12 : 16;
+    for (let i = 0; i < 2; i++) {
+      const angle = orbit + i * Math.PI;
+      ctx.beginPath();
+      ctx.arc(p.x + Math.cos(angle) * radius * scale, p.y - 10 * scale + Math.sin(angle) * radius * 0.45 * scale, 2.8 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
 function drawTower(ctx, grid, tower, now) {
   const p = centerOf(grid, tower);
   const stats = towerStats(tower);
   const spriteScale = Math.max(0.7, grid.tileW / 34);
   if (hasTowerSprite(tower) && drawTowerSprite(ctx, tower, p.x, p.y + 8, spriteScale)) {
+    drawTowerSpriteEnhancement(ctx, p, tower, stats, now, spriteScale);
     drawTowerLevel(ctx, p, tower);
     return;
   }
@@ -418,7 +467,8 @@ function drawEnemy(ctx, enemy, now) {
   ctx.fill();
 
   const spriteScale = Math.max(0.7, width / 34);
-  if (!hasEnemySprite(enemy) || !drawEnemySprite(ctx, enemy, enemy.x, enemy.y + 8 + bob, spriteScale)) {
+  const usedSprite = hasEnemySprite(enemy) && drawEnemySprite(ctx, enemy, enemy.x, enemy.y + 8 + bob, spriteScale);
+  if (!usedSprite) {
     switch (enemy.type) {
       case "scout":
         drawScout(ctx, enemy, width, height, bob);
@@ -450,6 +500,47 @@ function drawEnemy(ctx, enemy, now) {
       default:
         ctx.fillStyle = enemy.def.color;
         ctx.fillRect(enemy.x - width / 2, enemy.y - height / 2 + bob, width, height);
+    }
+  } else {
+    if (enemy.type === "mender") {
+      ctx.strokeStyle = "rgba(111, 243, 164, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + bob, 18 + Math.sin(now * 0.018) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (enemy.type === "jammer") {
+      ctx.globalAlpha = 0.14 + (Math.sin(now * 0.018) + 1) * 0.05;
+      ctx.strokeStyle = "#de7dff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + bob, 20, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (enemy.type === "bastion") {
+      ctx.strokeStyle = "#ffd36a";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(enemy.x - 10, enemy.y + 12 + bob);
+      ctx.lineTo(enemy.x + 10, enemy.y + 12 + bob);
+      ctx.stroke();
+    }
+    if (enemy.type === "boss") {
+      ctx.strokeStyle = "#ffb3a7";
+      ctx.lineWidth = 3;
+      for (const leg of [-18, -7, 7, 18]) {
+        const swing = Math.sin(now * 0.012 + leg) * 4;
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + leg, enemy.y + 12 + bob);
+        ctx.lineTo(enemy.x + leg + swing, enemy.y + 24 + bob);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(255, 111, 95, 0.45)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + bob, 28, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 

@@ -1,5 +1,12 @@
-export const STORAGE_KEY = "iron-grid-defense-save-v3";
-const LEGACY_KEYS = ["iron-grid-defense-save-v2"];
+export const STORAGE_KEY = "iron-grid-defense-save-v4";
+const LEGACY_KEYS = ["iron-grid-defense-save-v3", "iron-grid-defense-save-v2"];
+export const ART_THEME_KEY = "iron-grid-defense-art-theme-v1";
+const VALID_ART_THEMES = new Set(["sprites", "classic"]);
+
+function normalizeArtTheme(theme) {
+  if (theme === "auto") return "sprites";
+  return VALID_ART_THEMES.has(theme) ? theme : "sprites";
+}
 
 export function hasSavedGame(storage = localStorage) {
   try {
@@ -39,7 +46,8 @@ export function serializeState(state, abilityDefs, manual = false) {
   };
 
   return {
-    version: 3,
+    version: 4,
+    artTheme: normalizeArtTheme(state.artTheme),
     started: state.started,
     paused: state.paused,
     speedIndex: state.speedIndex,
@@ -88,11 +96,17 @@ export function serializeState(state, abilityDefs, manual = false) {
 
 export function migrateSave(rawSave) {
   if (!rawSave || typeof rawSave !== "object") return null;
-  if (rawSave.version === 3) return rawSave;
-  if (!rawSave.version || rawSave.version === 2) {
+  if (rawSave.version === 4) {
     return {
       ...rawSave,
-      version: 3,
+      artTheme: normalizeArtTheme(rawSave.artTheme),
+    };
+  }
+  if (!rawSave.version || rawSave.version === 2 || rawSave.version === 3) {
+    return {
+      ...rawSave,
+      version: 4,
+      artTheme: normalizeArtTheme(rawSave.artTheme),
       waveCountdown: Number(rawSave.waveCountdown) || 0,
       stats: {
       towersBuilt: Number(rawSave.stats?.towersBuilt) || 0,
@@ -134,4 +148,21 @@ export function readSavedGame(storage = localStorage) {
 
 export function writeSavedGame(payload, storage = localStorage) {
   storage.setItem(STORAGE_KEY, JSON.stringify(payload));
+}
+
+export function readArtTheme(storage = localStorage) {
+  try {
+    const value = storage.getItem(ART_THEME_KEY);
+    return value ? normalizeArtTheme(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeArtTheme(theme, storage = localStorage) {
+  try {
+    storage.setItem(ART_THEME_KEY, normalizeArtTheme(theme));
+  } catch {
+    // Storage may be unavailable in private or embedded contexts.
+  }
 }

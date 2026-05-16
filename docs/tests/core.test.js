@@ -22,6 +22,7 @@ function baseState() {
     started: true,
     paused: false,
     speedIndex: 0,
+    artTheme: "sprites",
     credits: GAME_DATA.mission.startCredits,
     base: GAME_DATA.mission.baseIntegrity,
     waveIndex: 0,
@@ -108,20 +109,21 @@ const grid = createGrid(GAME_DATA.grid);
   const state = baseState();
   state.towers.push(makeTower(GAME_DATA.towers, "rifle", 2, 12));
   const payload = serializeState(state, GAME_DATA.abilities, true);
-  assert(payload.version === 3, "new saves should use version 3");
+  assert(payload.version === 4, "new saves should use version 4");
+  assert(payload.artTheme === "sprites", "save payload should preserve art theme");
   assert(payload.stats.saves === 1, "manual save should increment save count in payload");
 }
 
 {
   const migrated = migrateSave({ version: 2, started: true, stats: { towersBuilt: 1 } });
-  assert(migrated.version === 3, "v2 saves should migrate to v3");
+  assert(migrated.version === 4, "legacy saves should migrate to v4");
   assert(migrated.waveCountdown === 0, "migrated saves should default wave countdown");
   assert(migrated.stats.towersBuilt === 1, "migrated saves should preserve stats");
 }
 
 {
   const terminalSave = {
-    version: 3,
+    version: 4,
     started: true,
     base: 84,
     waveIndex: GAME_DATA.waves.length,
@@ -134,7 +136,7 @@ const grid = createGrid(GAME_DATA.grid);
 
 {
   const activeSave = {
-    version: 3,
+    version: 4,
     started: true,
     base: 84,
     waveIndex: GAME_DATA.waves.length - 1,

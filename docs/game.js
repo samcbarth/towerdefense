@@ -1,6 +1,6 @@
 import { GAME_DATA } from "./data.js";
 import * as Core from "./modules/core.js";
-import { loadGameAssets } from "./modules/assets.js";
+import { loadGameAssets, setArtTheme } from "./modules/assets.js";
 import * as Storage from "./modules/storage.js";
 import * as UiPanel from "./modules/ui.js";
 import { drawBattlefield } from "./modules/render.js";
@@ -29,6 +29,7 @@ const ui = {
   saveGame: document.getElementById("saveGame"),
   loadGame: document.getElementById("loadGame"),
   resetGame: document.getElementById("resetGame"),
+  artTheme: document.getElementById("artTheme"),
   soundToggle: document.getElementById("soundToggle"),
   muteToggle: document.getElementById("muteToggle"),
   audioStatus: document.getElementById("audioStatus"),
@@ -58,6 +59,11 @@ const BASE_CANVAS_WIDTH = 1280;
 const BASE_CANVAS_HEIGHT = 860;
 const SPEED_STEPS = [1, 1.5, 2];
 const DEBUG_MODE = new URLSearchParams(window.location.search).get("debug") === "1";
+const DEFAULT_ART_THEME = "sprites";
+const ART_THEME_LABELS = {
+  sprites: "Art Sprites",
+  classic: "Art Classic",
+};
 
 const grid = Core.createGrid(GAME_DATA.grid);
 
@@ -87,6 +93,7 @@ const state = {
   started: false,
   paused: false,
   speedIndex: 0,
+  artTheme: Storage.readArtTheme() || DEFAULT_ART_THEME,
   challengeKey: "standard",
   credits: GAME_DATA.mission.startCredits,
   base: GAME_DATA.mission.baseIntegrity,
@@ -125,6 +132,8 @@ const audio = {
   lastImpactAt: 0,
   fallbackUrl: null,
 };
+
+setArtTheme(state.artTheme);
 
 function setAudioStatus(text, mode = "") {
   ui.audioStatus.textContent = text;
@@ -470,6 +479,17 @@ function restoreAbilityCooldowns(cooldowns = {}) {
   Storage.restoreAbilityCooldowns(abilityDefs, cooldowns);
 }
 
+function applyArtTheme(theme, options = {}) {
+  const { silent = false, persist = true, save = true } = options;
+  state.artTheme = theme === "classic" ? "classic" : "sprites";
+  setArtTheme(state.artTheme);
+  if (persist) Storage.writeArtTheme(state.artTheme);
+  if (!silent) setMessage(`Art theme set to ${state.artTheme === "classic" ? "Classic" : "Sprites"}.`, true);
+  if (save && state.started && !state.gameOver) saveGameState();
+  updateUi();
+  draw();
+}
+
 function saveGameState(manual = false) {
   if (!window.localStorage || !state.started) return false;
   const payload = Storage.serializeState(state, abilityDefs, manual);
@@ -507,6 +527,8 @@ function loadGameState(manual = false) {
 
   try {
     state.started = Boolean(save.started);
+    state.artTheme = Storage.readArtTheme() || (save.artTheme === "classic" ? "classic" : "sprites");
+    setArtTheme(state.artTheme);
     state.paused = Boolean(save.paused);
     state.pauseStartedAt = state.paused ? performance.now() / 1000 : 0;
     state.speedIndex = Math.max(0, Math.min(SPEED_STEPS.length - 1, Number(save.speedIndex) || 0));
@@ -1169,6 +1191,8 @@ function updateUi() {
   ui.saveGame.disabled = !state.started || state.gameOver;
   ui.loadGame.disabled = !hasSavedGame();
   ui.resetGame.disabled = false;
+  ui.artTheme.textContent = ART_THEME_LABELS[state.artTheme] || ART_THEME_LABELS.sprites;
+  ui.artTheme.classList.toggle("active", state.artTheme === "sprites");
   ui.pauseOverlay.classList.toggle("hidden", !state.paused || state.gameOver);
   ui.battleBanner.textContent = state.waveCountdown > 0
     ? `Wave starts in ${Math.ceil(state.waveCountdown)}`
@@ -1351,6 +1375,11 @@ ui.resetGame.addEventListener("click", () => {
   ensureAudio();
   playUi();
   hardResetMission();
+});
+ui.artTheme.addEventListener("click", () => {
+  ensureAudio();
+  playUi();
+  applyArtTheme(state.artTheme === "sprites" ? "classic" : "sprites");
 });
 ui.debugCredits.addEventListener("click", () => {
   if (!DEBUG_MODE) return;
