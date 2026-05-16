@@ -214,6 +214,15 @@ h2 {
   line-height: 1.35;
 }
 
+.wave-traits {
+  margin-top: 8px;
+  color: var(--steel);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 canvas {
   display: block;
   width: 100%;
@@ -251,6 +260,33 @@ canvas {
   line-height: 1.55;
 }
 
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0 14px;
+}
+
+.result-stat {
+  border: 1px solid var(--line);
+  background: rgba(13, 23, 20, 0.85);
+  padding: 10px 12px;
+}
+
+.result-stat strong {
+  display: block;
+  color: var(--accent);
+  font-size: 18px;
+  margin-bottom: 2px;
+}
+
+.result-stat span {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .button-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -280,6 +316,35 @@ canvas {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.upgrade-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.upgrade-choice {
+  text-align: left;
+  border-color: rgba(111, 243, 164, 0.28);
+}
+
+.upgrade-choice strong,
+.upgrade-choice span {
+  display: block;
+}
+
+.upgrade-choice span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.upgrade-choice.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(111, 243, 164, 0.16);
 }
 
 .combat-log {
@@ -313,5 +378,9 @@ canvas {
     border-left: 0;
     border-right: 0;
     border-bottom: 1px solid rgba(111, 243, 164, 0.24);
+  }
+
+  .result-stats {
+    grid-template-columns: 1fr;
   }
 }

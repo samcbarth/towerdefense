@@ -14,20 +14,34 @@ const ui = {
   towerButtons: document.getElementById("towerButtons"),
   abilityButtons: document.getElementById("abilityButtons"),
   upgrade: document.getElementById("upgrade"),
+  upgradeChoices: document.getElementById("upgradeChoices"),
   sell: document.getElementById("sell"),
   nextWave: document.getElementById("nextWave"),
+  pauseToggle: document.getElementById("pauseToggle"),
+  speedToggle: document.getElementById("speedToggle"),
+  saveGame: document.getElementById("saveGame"),
+  loadGame: document.getElementById("loadGame"),
   soundToggle: document.getElementById("soundToggle"),
   muteToggle: document.getElementById("muteToggle"),
   audioStatus: document.getElementById("audioStatus"),
   volume: document.getElementById("volume"),
   overlay: document.getElementById("overlay"),
+  overlayTitle: document.getElementById("overlayTitle"),
+  overlayText: document.getElementById("overlayText"),
+  resultStats: document.getElementById("resultStats"),
   start: document.getElementById("start"),
+  waveTraits: document.getElementById("waveTraits"),
 };
 
 const towerDefs = GAME_DATA.towers;
 const enemyDefs = GAME_DATA.enemies;
 const waves = GAME_DATA.waves;
 const abilityDefs = GAME_DATA.abilities;
+const STORAGE_KEY = "iron-grid-defense-save-v2";
+const BASE_CANVAS_WIDTH = 1280;
+const BASE_CANVAS_HEIGHT = 860;
+const SPEED_STEPS = [1, 1.5, 2];
+
 function expandRectCells(rects = []) {
   const cells = [];
   rects.forEach((rect) => {
@@ -57,21 +71,31 @@ const grid = {
 };
 
 function fitGridToCanvas() {
-  const paddingX = 76;
-  const paddingTop = 58;
-  const paddingBottom = 94;
-  const maxTileW = Math.floor((canvas.width - paddingX * 2) * 2 / (grid.cols + grid.rows));
-  const maxTileH = Math.floor((canvas.height - paddingTop - paddingBottom) * 2 / (grid.cols + grid.rows));
-  grid.tileW = Math.max(24, Math.min(grid.tileW, maxTileW));
-  grid.tileH = Math.max(12, Math.min(grid.tileH, maxTileH));
-  grid.originX = canvas.width / 2;
-  grid.originY = paddingTop;
+  const scale = Math.min(canvas.width / BASE_CANVAS_WIDTH, canvas.height / BASE_CANVAS_HEIGHT) || 1;
+  grid.tileW = Math.max(20, Math.round(GAME_DATA.grid.tileW * scale));
+  grid.tileH = Math.max(10, Math.round(GAME_DATA.grid.tileH * scale));
+  grid.originX = Math.round(GAME_DATA.grid.originX * (canvas.width / BASE_CANVAS_WIDTH));
+  grid.originY = Math.round(GAME_DATA.grid.originY * (canvas.height / BASE_CANVAS_HEIGHT));
 }
 
-fitGridToCanvas();
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+    fitGridToCanvas();
+  }
+}
+
+resizeCanvas();
 
 const state = {
   started: false,
+  paused: false,
+  speedIndex: 0,
   credits: GAME_DATA.mission.startCredits,
   base: GAME_DATA.mission.baseIntegrity,
   waveIndex: 0,
@@ -86,11 +110,22 @@ const state = {
   selectedAbility: null,
   selectedTower: null,
   hoverCell: null,
+  upgradeKey: "",
   message: "Select a tower or commander ability.",
   log: ["Mission systems online."],
   gameOver: false,
   victory: false,
   lastTime: 0,
+  pauseStartedAt: 0,
+  stats: {
+    towersBuilt: 0,
+    towersSold: 0,
+    enemiesDestroyed: 0,
+    damageDealt: 0,
+    abilitiesUsed: 0,
+    wavesCleared: 0,
+    saves: 0,
+  },
 };
 
 const audio = {
@@ -428,18 +463,119 @@ function makeTower(type, x, y) {
     x,
     y,
     level: 1,
+    branch: null,
     cooldown: 0,
     def: towerDefs[type],
   };
 }
 
+function branchData(tower) {
+  if (!tower.branch || !tower.def.branches) return null;
+  return tower.def.branches[tower.branch];
+}
+
+function branchTier(tower) {
+  const branch = branchData(tower);
+  if (!branch) return null;
+  return branch.tiers[Math.max(0, tower.level - 2)] || null;
+}
+
+function towerUpgradeCost(tower, branchKey = tower.branch) {
+  if (tower.def.branches && tower.level === 1 && branchKey) {
+    return tower.def.branches[branchKey].tiers[0].cost;
+  }
+  if (tower.def.branches && tower.level === 2 && branchKey) {
+    return tower.def.branches[branchKey].tiers[1].cost;
+  }
+  return Math.round(tower.def.cost * (0.72 + tower.level * 0.52));
+}
+
+function towerUpgradeLabel(tower) {
+  if (tower.def.branches && tower.level === 1) return "Choose Branch";
+  if (tower.level === 2 && tower.branch) return "Upgrade Tier 3";
+  return "Upgrade";
+}
+
+function renderUpgradeChoices() {
+  ui.upgradeChoices.innerHTML = "";
+  const tower = state.selectedTower;
+  if (!tower || tower.level >= 3) return;
+
+  if (tower.def.branches && tower.level === 1) {
+    Object.entries(tower.def.branches).forEach(([key, branch]) => {
+      const button = document.createElement("button");
+      button.className = "upgrade-choice";
+      button.innerHTML = `<strong>${branch.name}</strong><span>${branch.tiers[0].cost} cr - ${branch.description}</span>`;
+      button.addEventListener("click", () => chooseBranchUpgrade(key));
+      ui.upgradeChoices.appendChild(button);
+    });
+    return;
+  }
+
+  const branch = branchData(tower);
+  if (branch) {
+    const info = document.createElement("button");
+    info.className = "upgrade-choice active";
+    const tier = branchTier(tower);
+    info.disabled = true;
+    info.innerHTML = `<strong>${branch.name}</strong><span>${tier ? `${towerUpgradeCost(tower)} cr - branch locked in.` : "Branch locked in."}</span>`;
+    ui.upgradeChoices.appendChild(info);
+  }
+}
+
+function chooseBranchUpgrade(branchKey) {
+  const tower = state.selectedTower;
+  if (!tower || tower.level !== 1 || !tower.def.branches || !tower.def.branches[branchKey]) return;
+  const branch = tower.def.branches[branchKey];
+  const cost = branch.tiers[0].cost;
+  if (state.credits < cost) {
+    setMessage(`Insufficient credits. ${branch.name} costs ${cost}.`, true);
+    playDenied();
+    return;
+  }
+  state.credits -= cost;
+  tower.branch = branchKey;
+  tower.level = 2;
+  tower.cooldown = 0;
+  setMessage(`${tower.def.name} branched into ${branch.name}.`, true);
+  playDeploy();
+  state.upgradeKey = "";
+  saveGameState();
+}
+
 function towerStats(tower) {
   const scale = 1 + (tower.level - 1) * 0.34;
-  return {
+  const tier = branchTier(tower);
+  const stats = {
     range: tower.def.range + (tower.level - 1) * 0.22,
     fireRate: Math.max(0.22, tower.def.fireRate * (1 - (tower.level - 1) * 0.12)),
     damage: tower.def.damage * scale,
+    splash: tower.def.splash || 0,
+    slow: tower.def.slow,
+    slowTime: tower.def.slowTime,
+    pierce: tower.def.pierce,
+    homing: tower.def.homing,
+    armorPierce: 0,
+    bossMultiplier: 1,
+    breaksShield: false,
+    armorShred: 0,
+    color: tower.def.color,
+    accent: tower.def.accent,
   };
+  if (!tier) return stats;
+
+  stats.range += tier.rangeBonus || 0;
+  stats.fireRate = Math.max(0.18, stats.fireRate * (tier.fireRateMultiplier || 1));
+  stats.damage *= tier.damageMultiplier || 1;
+  stats.splash += tier.splashBonus || 0;
+  stats.slow = tier.slowMultiplier ?? stats.slow;
+  stats.slowTime = (stats.slowTime || 0) + (tier.slowTimeBonus || 0);
+  stats.armorPierce = tier.armorPierce || 0;
+  stats.bossMultiplier = tier.bossMultiplier || 1;
+  stats.breaksShield = Boolean(tier.breaksShield);
+  stats.armorShred = tier.armorShred || 0;
+  stats.accent = branchData(tower).color || stats.accent;
+  return stats;
 }
 
 function addLog(message) {
@@ -458,6 +594,195 @@ function describeWave(index) {
   return wave.groups
     .map((group) => `${group.count} ${enemyDefs[group.type].name}`)
     .join(" + ");
+}
+
+function describeWaveTraits(index) {
+  const wave = waves[index];
+  if (!wave) return "No more threats scheduled.";
+  const traits = new Set();
+  wave.groups.forEach((group) => {
+    const def = enemyDefs[group.type];
+    if (def.threat) traits.add(def.threat);
+    if (def.boss) traits.add("Boss");
+    if (def.jammer) traits.add("Disruptor");
+    if (def.shield) traits.add("Shielded");
+    if ((def.armor || 0) >= 6) traits.add("Armored");
+  });
+  return traits.size ? `Traits: ${Array.from(traits).join(" / ")}` : "Traits: Standard assault";
+}
+
+function snapshotAbilityCooldowns() {
+  const now = state.paused && state.pauseStartedAt ? state.pauseStartedAt : performance.now() / 1000;
+  return Object.fromEntries(
+    Object.entries(abilityDefs).map(([key, ability]) => [key, Math.max(0, (ability.readyAt || 0) - now)])
+  );
+}
+
+function restoreAbilityCooldowns(cooldowns = {}) {
+  const now = performance.now() / 1000;
+  Object.entries(abilityDefs).forEach(([key, ability]) => {
+    const remaining = Number(cooldowns[key] || 0);
+    ability.readyAt = remaining > 0 ? now + remaining : 0;
+  });
+}
+
+function saveGameState(manual = false) {
+  if (!window.localStorage || !state.started) return false;
+  const saveStats = {
+    ...state.stats,
+    saves: manual ? state.stats.saves + 1 : state.stats.saves,
+  };
+  const payload = {
+    version: 2,
+    started: state.started,
+    paused: state.paused,
+    speedIndex: state.speedIndex,
+    credits: state.credits,
+    base: state.base,
+    waveIndex: state.waveIndex,
+    waveActive: state.waveActive,
+    spawnQueue: state.spawnQueue.map((item) => ({ ...item })),
+    spawnTimer: state.spawnTimer,
+    towers: state.towers.map((tower) => ({
+      type: tower.type,
+      x: tower.x,
+      y: tower.y,
+      level: tower.level,
+      branch: tower.branch,
+      cooldown: tower.cooldown,
+    })),
+    enemies: state.enemies.map((enemy) => ({
+      type: enemy.type,
+      hp: enemy.hp,
+      maxHp: enemy.maxHp,
+      shield: enemy.shield,
+      path: enemy.path.map((cell) => ({ x: cell.x, y: cell.y })),
+      pathIndex: enemy.pathIndex,
+      x: enemy.x,
+      y: enemy.y,
+      slowUntil: enemy.slowUntil,
+      slowMultiplier: enemy.slowMultiplier,
+      reached: enemy.reached,
+    })),
+    selectedTowerType: state.selectedTowerType,
+    selectedAbility: state.selectedAbility,
+    message: state.message,
+    log: state.log,
+    stats: saveStats,
+    cooldowns: snapshotAbilityCooldowns(),
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    if (manual) state.stats.saves = saveStats.saves;
+    if (manual) setMessage("Mission saved.", true);
+    return true;
+  } catch {
+    if (manual) setMessage("Save failed: storage unavailable.", true);
+    return false;
+  }
+}
+
+function clearSavedGame() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function hasSavedGame() {
+  try {
+    return Boolean(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+function loadGameState(manual = false) {
+  if (!window.localStorage) return false;
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    if (manual) setMessage("No saved mission found.", true);
+    return false;
+  }
+
+  try {
+    const save = JSON.parse(raw);
+    state.started = Boolean(save.started);
+    state.paused = Boolean(save.paused);
+    state.pauseStartedAt = state.paused ? performance.now() / 1000 : 0;
+    state.speedIndex = Math.max(0, Math.min(SPEED_STEPS.length - 1, Number(save.speedIndex) || 0));
+    state.credits = Number(save.credits) || GAME_DATA.mission.startCredits;
+    state.base = Number(save.base) || GAME_DATA.mission.baseIntegrity;
+    state.waveIndex = Number(save.waveIndex) || 0;
+    state.waveActive = Boolean(save.waveActive);
+    state.spawnQueue = Array.isArray(save.spawnQueue) ? save.spawnQueue.map((item) => ({ type: item.type, delay: Number(item.delay) || 0 })) : [];
+    state.spawnTimer = Number(save.spawnTimer) || 0;
+    state.towers = Array.isArray(save.towers)
+      ? save.towers.map((tower) => ({
+          type: tower.type,
+          x: tower.x,
+          y: tower.y,
+          level: Math.max(1, Math.min(3, Number(tower.level) || 1)),
+          branch: tower.branch || null,
+          cooldown: Number(tower.cooldown) || 0,
+          def: towerDefs[tower.type],
+        })).filter((tower) => tower.def)
+      : [];
+    state.enemies = Array.isArray(save.enemies)
+      ? save.enemies.map((enemy) => {
+          const def = enemyDefs[enemy.type];
+          if (!def) return null;
+          return {
+            type: enemy.type,
+            def,
+            hp: Number(enemy.hp) || def.hp,
+            maxHp: Number(enemy.maxHp) || def.hp,
+            shield: Number(enemy.shield) || 0,
+            path: Array.isArray(enemy.path) ? enemy.path.map((cell) => ({ x: cell.x, y: cell.y })) : [],
+            pathIndex: Math.max(0, Number(enemy.pathIndex) || 0),
+            x: Number(enemy.x) || 0,
+            y: Number(enemy.y) || 0,
+            slowUntil: Number(enemy.slowUntil) || 0,
+            slowMultiplier: Number(enemy.slowMultiplier) || 1,
+            reached: Boolean(enemy.reached),
+          };
+        }).filter(Boolean)
+      : [];
+    state.selectedTowerType = save.selectedTowerType || null;
+    state.selectedAbility = save.selectedAbility || null;
+    state.selectedTower = null;
+    state.hoverCell = null;
+    state.projectiles = [];
+    state.effects = [];
+    state.message = save.message || "Mission restored.";
+    state.log = Array.isArray(save.log) && save.log.length ? save.log.slice(0, 5) : ["Mission restored."];
+    state.gameOver = false;
+    state.victory = false;
+    state.lastTime = performance.now();
+    state.stats = {
+      towersBuilt: Number(save.stats?.towersBuilt) || 0,
+      towersSold: Number(save.stats?.towersSold) || 0,
+      enemiesDestroyed: Number(save.stats?.enemiesDestroyed) || 0,
+      damageDealt: Number(save.stats?.damageDealt) || 0,
+      abilitiesUsed: Number(save.stats?.abilitiesUsed) || 0,
+      wavesCleared: Number(save.stats?.wavesCleared) || 0,
+      saves: Number(save.stats?.saves) || 0,
+    };
+    restoreAbilityCooldowns(save.cooldowns || {});
+    ui.overlay.classList.add("hidden");
+    ui.overlayTitle.textContent = "Hold the corridor.";
+    ui.overlayText.textContent = "Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.";
+    ui.resultStats.innerHTML = "";
+    ui.start.textContent = "Start Mission";
+    state.upgradeKey = "";
+    if (manual) setMessage("Mission restored from save.", true);
+    return true;
+  } catch {
+    if (manual) setMessage("Save data was corrupted.", true);
+    return false;
+  }
 }
 
 function spawnEnemy(type) {
@@ -493,10 +818,14 @@ function queueWave() {
   state.spawnTimer = 0.35;
   setMessage(`Wave ${state.waveIndex + 1}: ${wave.name} inbound.`, true);
   playWaveCue();
+  saveGameState();
 }
 
 function damageEnemy(enemy, amount, options = {}) {
-  let damage = Math.max(1, amount - (enemy.def.armor || 0));
+  if (options.breaksShield) enemy.shield = 0;
+  const effectiveArmor = Math.max(0, (enemy.def.armor || 0) - (options.armorPierce || 0) - (options.armorShred || 0));
+  let damage = Math.max(1, amount * (enemy.def.boss ? options.bossMultiplier || 1 : 1) - effectiveArmor);
+  state.stats.damageDealt += damage;
   if (enemy.shield > 0) {
     const shieldHit = Math.min(enemy.shield, damage);
     enemy.shield -= shieldHit;
@@ -511,6 +840,7 @@ function damageEnemy(enemy, amount, options = {}) {
     state.credits += enemy.def.reward;
     addEffect(enemy.x, enemy.y, enemy.def.color, 0.4, 28);
     enemy.dead = true;
+    state.stats.enemiesDestroyed += 1;
   }
 }
 
@@ -568,11 +898,13 @@ function updateEnemies(dt, now) {
     const clearedWave = waves[state.waveIndex];
     state.waveIndex++;
     state.credits += clearedWave.reward;
+    state.stats.wavesCleared += 1;
     if (state.waveIndex >= waves.length) {
       endGame(true);
     } else {
       setMessage(`Wave cleared. +${clearedWave.reward} credits. Prepare for wave ${state.waveIndex + 1}.`, true);
     }
+    saveGameState();
   }
 }
 
@@ -599,9 +931,14 @@ function updateTowers(dt) {
     tower.cooldown = stats.fireRate * jammerPenalty;
 
     if (tower.def.pierce) {
-      damageEnemy(target, stats.damage);
-      state.projectiles.push({ x: origin.x, y: origin.y - 34, tx: target.x, ty: target.y, life: 0.16, color: tower.def.accent, beam: true });
-      addEffect(target.x, target.y, tower.def.accent, 0.2, 16);
+      damageEnemy(target, stats.damage, {
+        armorPierce: stats.armorPierce,
+        bossMultiplier: stats.bossMultiplier,
+        breaksShield: stats.breaksShield,
+        armorShred: stats.armorShred,
+      });
+      state.projectiles.push({ x: origin.x, y: origin.y - 34, tx: target.x, ty: target.y, life: 0.16, color: stats.accent, beam: true });
+      addEffect(target.x, target.y, stats.accent, 0.2, 16);
       playFire(tower.type);
       playImpact(target.def.boss);
     } else {
@@ -611,10 +948,14 @@ function updateTowers(dt) {
         target,
         speed: tower.def.homing ? 460 : 620,
         damage: stats.damage,
-        splash: tower.def.splash || 0,
-        slow: tower.def.slow,
-        slowTime: tower.def.slowTime,
-        color: tower.def.accent,
+        splash: stats.splash,
+        slow: stats.slow,
+        slowTime: stats.slowTime,
+        armorPierce: stats.armorPierce,
+        bossMultiplier: stats.bossMultiplier,
+        breaksShield: stats.breaksShield,
+        armorShred: stats.armorShred,
+        color: stats.accent,
       });
       playFire(tower.type);
     }
@@ -638,12 +979,26 @@ function updateProjectiles(dt) {
       if (p.splash > 0) {
         for (const enemy of state.enemies) {
           const splashDist = Math.hypot(enemy.x - p.target.x, enemy.y - p.target.y) / grid.tileW;
-          if (splashDist <= p.splash) damageEnemy(enemy, p.damage * (1 - splashDist / (p.splash + 0.1)));
+          if (splashDist <= p.splash) {
+            damageEnemy(enemy, p.damage * (1 - splashDist / (p.splash + 0.1)), {
+              armorPierce: p.armorPierce,
+              bossMultiplier: p.bossMultiplier,
+              breaksShield: p.breaksShield,
+              armorShred: p.armorShred,
+            });
+          }
         }
         addEffect(p.target.x, p.target.y, p.color, 0.35, 42);
         playImpact(true);
       } else {
-        damageEnemy(p.target, p.damage, { slow: p.slow, slowTime: p.slowTime });
+        damageEnemy(p.target, p.damage, {
+          slow: p.slow,
+          slowTime: p.slowTime,
+          armorPierce: p.armorPierce,
+          bossMultiplier: p.bossMultiplier,
+          breaksShield: p.breaksShield,
+          armorShred: p.armorShred,
+        });
         addEffect(p.target.x, p.target.y, p.color, 0.22, 18);
         playImpact(p.target.def.boss);
       }
@@ -682,9 +1037,11 @@ function placeTower(cell) {
   }
   state.towers.push(makeTower(type, cell.x, cell.y));
   state.credits -= def.cost;
+  state.stats.towersBuilt += 1;
   refreshEnemyPaths();
   setMessage(`${def.name} deployed.`, true);
   playDeploy();
+  saveGameState();
 }
 
 function useAbility(cell) {
@@ -701,9 +1058,11 @@ function useAbility(cell) {
   if (key === "repair") {
     state.base = Math.min(GAME_DATA.mission.baseIntegrity, state.base + ability.heal);
     ability.readyAt = now + ability.cooldown;
+    state.stats.abilitiesUsed += 1;
     setMessage("Emergency repair completed.", true);
     addEffect(centerOf(grid.base).x, centerOf(grid.base).y, ability.color, 0.7, 70);
     playAbility(key);
+    saveGameState();
     return;
   }
 
@@ -720,15 +1079,23 @@ function useAbility(cell) {
     }
   }
   ability.readyAt = now + ability.cooldown;
+  state.stats.abilitiesUsed += 1;
   setMessage(`${ability.name} executed.`, true);
   addEffect(hit.x, hit.y, ability.color, 0.65, ability.radius * grid.tileW);
   playAbility(key);
+  saveGameState();
 }
 
 function upgradeSelected() {
   const tower = state.selectedTower;
   if (!tower || tower.level >= 3) return;
-  const cost = Math.round(tower.def.cost * (0.72 + tower.level * 0.52));
+  const cost = towerUpgradeCost(tower);
+  if (tower.def.branches && tower.level === 1 && !tower.branch) {
+    setMessage("Choose a branch upgrade from the panel below.", true);
+    playUi();
+    renderUpgradeChoices();
+    return;
+  }
   if (state.credits < cost) {
     setMessage(`Insufficient credits. Upgrade costs ${cost}.`, true);
     playDenied();
@@ -738,6 +1105,8 @@ function upgradeSelected() {
   tower.level++;
   setMessage(`${tower.def.name} upgraded to tier ${tower.level}.`, true);
   playDeploy();
+  state.upgradeKey = "";
+  saveGameState();
 }
 
 function sellSelected() {
@@ -746,8 +1115,26 @@ function sellSelected() {
   state.credits += Math.round(tower.def.cost * (0.5 + tower.level * 0.18));
   state.towers = state.towers.filter((item) => item !== tower);
   state.selectedTower = null;
+  state.stats.towersSold += 1;
   setMessage("Tower sold.", true);
   playUi();
+  saveGameState();
+}
+
+function renderMissionSummary(victory) {
+  ui.resultStats.innerHTML = [
+    { label: "Waves cleared", value: `${state.stats.wavesCleared}/${waves.length}` },
+    { label: "Enemies destroyed", value: `${state.stats.enemiesDestroyed}` },
+    { label: "Damage dealt", value: `${Math.round(state.stats.damageDealt)}` },
+    { label: "Towers built", value: `${state.stats.towersBuilt}` },
+    { label: "Towers sold", value: `${state.stats.towersSold}` },
+    { label: "Abilities used", value: `${state.stats.abilitiesUsed}` },
+    { label: "Manual saves", value: `${state.stats.saves}` },
+  ].map((item) => `<div class="result-stat"><strong>${item.value}</strong><span>${item.label}</span></div>`).join("");
+  ui.overlayTitle.textContent = victory ? "Sector secured." : "Base overrun.";
+  ui.overlayText.textContent = victory
+    ? "The convoy held and the battlefield is secure. Restart to attempt a faster clear or try a different branch plan."
+    : "The line collapsed. Restart, rework the maze, and let the new tower branches do the heavy lifting.";
 }
 
 function endGame(victory) {
@@ -755,17 +1142,17 @@ function endGame(victory) {
   state.victory = victory;
   addLog(victory ? "Mission victory confirmed." : "Base integrity failed.");
   playMissionEnd(victory);
+  renderMissionSummary(victory);
   ui.overlay.classList.remove("hidden");
-  ui.overlay.querySelector("h2").textContent = victory ? "Sector secured." : "Base overrun.";
-  ui.overlay.querySelector("p").textContent = victory
-    ? "The convoy has been broken. Refresh or restart to run the mission again."
-    : "The line collapsed. Restart and reshape the maze.";
   ui.start.textContent = "Restart Mission";
+  clearSavedGame();
 }
 
 function restart() {
   Object.assign(state, {
     started: true,
+    paused: false,
+    speedIndex: 0,
     credits: GAME_DATA.mission.startCredits,
     base: GAME_DATA.mission.baseIntegrity,
     waveIndex: 0,
@@ -780,14 +1167,30 @@ function restart() {
     selectedAbility: null,
     selectedTower: null,
     hoverCell: null,
+    upgradeKey: "",
     message: "Build a maze, then launch wave one.",
     log: ["Mission started.", "Build phase active."],
     gameOver: false,
     victory: false,
     lastTime: performance.now(),
+    pauseStartedAt: 0,
+    stats: {
+      towersBuilt: 0,
+      towersSold: 0,
+      enemiesDestroyed: 0,
+      damageDealt: 0,
+      abilitiesUsed: 0,
+      wavesCleared: 0,
+      saves: 0,
+    },
   });
   Object.values(abilityDefs).forEach((ability) => ability.readyAt = 0);
   ui.overlay.classList.add("hidden");
+  ui.overlayTitle.textContent = "Hold the corridor.";
+  ui.overlayText.textContent = "Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.";
+  ui.resultStats.innerHTML = "";
+  ui.start.textContent = "Start Mission";
+  saveGameState();
 }
 
 function drawTile(cell, fill, stroke = "#2a4037") {
@@ -972,13 +1375,24 @@ function updateUi() {
     ? `${state.waveActive ? "Active" : "Next"} Wave ${state.waveIndex + 1}: ${nextWave.name}`
     : "Mission complete";
   ui.waveComposition.textContent = describeWave(state.waveIndex);
+  ui.waveTraits.textContent = describeWaveTraits(state.waveIndex);
   ui.combatLog.innerHTML = state.log.map((entry) => `<span>${entry}</span>`).join("");
+  const selectedBranchName = state.selectedTower?.branch
+    ? towerDefs[state.selectedTower.type]?.branches?.[state.selectedTower.branch]?.name || ""
+    : "";
   ui.selection.textContent = state.selectedTower
-    ? `${state.selectedTower.def.name} tier ${state.selectedTower.level}. ${state.message}`
+    ? `${state.selectedTower.def.name} tier ${state.selectedTower.level}${selectedBranchName ? ` (${selectedBranchName})` : ""}. ${state.message}`
     : state.message;
   ui.upgrade.disabled = !state.selectedTower || state.selectedTower.level >= 3;
+  ui.upgrade.textContent = state.selectedTower ? towerUpgradeLabel(state.selectedTower) : "Upgrade";
   ui.sell.disabled = !state.selectedTower;
-  ui.nextWave.disabled = state.waveActive || state.gameOver || !state.started;
+  ui.nextWave.disabled = state.waveActive || state.gameOver || !state.started || state.paused;
+  ui.pauseToggle.disabled = !state.started || state.gameOver;
+  ui.pauseToggle.textContent = state.paused ? "Resume" : "Pause";
+  ui.speedToggle.disabled = !state.started || state.gameOver;
+  ui.speedToggle.textContent = `Speed x${SPEED_STEPS[state.speedIndex] || 1}`;
+  ui.saveGame.disabled = !state.started || state.gameOver;
+  ui.loadGame.disabled = !hasSavedGame();
 
   document.querySelectorAll("[data-tower]").forEach((button) => {
     button.classList.toggle("active", button.dataset.tower === state.selectedTowerType);
@@ -990,6 +1404,14 @@ function updateUi() {
     const label = button.querySelector("span");
     label.textContent = remaining > 0 ? `${Math.ceil(remaining)}s cooldown` : ability.text;
   });
+
+  const upgradeKey = state.selectedTower
+    ? `${state.selectedTower.type}:${state.selectedTower.level}:${state.selectedTower.branch || ""}`
+    : "none";
+  if (state.upgradeKey !== upgradeKey) {
+    state.upgradeKey = upgradeKey;
+    renderUpgradeChoices();
+  }
 }
 
 function tick(nowMs) {
@@ -997,12 +1419,13 @@ function tick(nowMs) {
   const dt = Math.min(0.033, (nowMs - state.lastTime) / 1000 || 0);
   state.lastTime = nowMs;
 
-  if (state.started && !state.gameOver) {
-    updateSpawning(dt);
-    updateEnemies(dt, now);
-    updateTowers(dt);
-    updateProjectiles(dt);
-    updateEffects(dt);
+  if (state.started && !state.gameOver && !state.paused) {
+    const scaledDt = dt * (SPEED_STEPS[state.speedIndex] || 1);
+    updateSpawning(scaledDt);
+    updateEnemies(scaledDt, now);
+    updateTowers(scaledDt);
+    updateProjectiles(scaledDt);
+    updateEffects(scaledDt);
   }
 
   draw();
@@ -1074,6 +1497,37 @@ ui.start.addEventListener("click", () => {
   playUi();
   restart();
 });
+ui.pauseToggle.addEventListener("click", () => {
+  ensureAudio();
+  if (!state.started || state.gameOver) return;
+  const now = performance.now() / 1000;
+  if (!state.paused) {
+    state.paused = true;
+    state.pauseStartedAt = now;
+    setMessage("Mission paused.", true);
+  } else {
+    const pausedFor = Math.max(0, now - (state.pauseStartedAt || now));
+    Object.values(abilityDefs).forEach((ability) => {
+      if (ability.readyAt) ability.readyAt += pausedFor;
+    });
+    state.enemies.forEach((enemy) => {
+      if (enemy.slowUntil) enemy.slowUntil += pausedFor;
+    });
+    state.paused = false;
+    state.pauseStartedAt = 0;
+    setMessage("Mission resumed.", true);
+  }
+  playUi();
+  saveGameState();
+});
+ui.speedToggle.addEventListener("click", () => {
+  ensureAudio();
+  if (!state.started || state.gameOver) return;
+  state.speedIndex = (state.speedIndex + 1) % SPEED_STEPS.length;
+  setMessage(`Time scale set to x${SPEED_STEPS[state.speedIndex]}.`, true);
+  playUi();
+  saveGameState();
+});
 ui.nextWave.addEventListener("click", () => {
   ensureAudio();
   queueWave();
@@ -1085,6 +1539,14 @@ ui.upgrade.addEventListener("click", () => {
 ui.sell.addEventListener("click", () => {
   ensureAudio();
   sellSelected();
+});
+ui.saveGame.addEventListener("click", () => {
+  ensureAudio();
+  saveGameState(true);
+});
+ui.loadGame.addEventListener("click", () => {
+  ensureAudio();
+  loadGameState(true);
 });
 ui.soundToggle.addEventListener("click", () => {
   ensureAudio();
@@ -1101,6 +1563,12 @@ ui.volume.addEventListener("input", () => {
   if (!audio.muted) playUi();
 });
 
+window.addEventListener("resize", resizeCanvas);
+window.addEventListener("beforeunload", () => {
+  if (state.started && !state.gameOver) saveGameState();
+});
+
 buildButtons();
 setVolume(ui.volume.value);
+loadGameState(false);
 requestAnimationFrame(tick);

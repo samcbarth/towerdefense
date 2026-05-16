@@ -19,6 +19,10 @@
         <span id="wave">Wave 0/0</span>
         <button id="soundToggle" class="sound-toggle">Test Sound</button>
         <button id="muteToggle" class="sound-toggle">Mute</button>
+        <button id="pauseToggle" class="sound-toggle">Pause</button>
+        <button id="speedToggle" class="sound-toggle">Speed x1</button>
+        <button id="saveGame" class="sound-toggle">Save</button>
+        <button id="loadGame" class="sound-toggle">Load</button>
         <span id="audioStatus" class="audio-status">Audio idle</span>
         <label class="volume-control" for="volume">
           <span>Vol</span>
@@ -35,6 +39,7 @@
         <div class="wave-preview">
           <span id="waveName">Wave preview unavailable</span>
           <strong id="waveComposition">No wave loaded</strong>
+          <span id="waveTraits" class="wave-traits">No enemy traits loaded</span>
         </div>
       </aside>
       <div class="game-frame">
@@ -42,8 +47,9 @@
         <div id="overlay" class="overlay">
           <div class="overlay-panel">
             <p class="eyebrow">WebGL-ready tactical prototype</p>
-            <h2>Hold the corridor.</h2>
-            <p>Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.</p>
+            <h2 id="overlayTitle">Hold the corridor.</h2>
+            <p id="overlayText">Build a maze, keep the convoy path open, upgrade towers, and use commander abilities to stop the siege wave.</p>
+            <div id="resultStats" class="result-stats" aria-live="polite"></div>
             <button id="start">Start Mission</button>
           </div>
         </div>
@@ -67,6 +73,7 @@
           <button id="sell" disabled>Sell</button>
           <button id="nextWave">Launch Wave</button>
         </div>
+        <div id="upgradeChoices" class="upgrade-choices"></div>
         <div id="combatLog" class="combat-log"></div>
       </div>
     </section>
