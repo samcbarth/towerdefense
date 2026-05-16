@@ -1,5 +1,6 @@
 import { GAME_DATA } from "./data.js";
 import * as Core from "./modules/core.js";
+import { loadGameAssets } from "./modules/assets.js";
 import * as Storage from "./modules/storage.js";
 import * as UiPanel from "./modules/ui.js";
 import { drawBattlefield } from "./modules/render.js";
@@ -1394,5 +1395,6 @@ window.addEventListener("beforeunload", () => {
 buildButtons();
 setVolume(ui.volume.value);
 ui.debugPanel.hidden = !DEBUG_MODE;
+loadGameAssets(GAME_DATA.art || {}).then(() => draw());
 loadGameState(false);
 requestAnimationFrame(tick);

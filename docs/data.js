@@ -287,6 +287,64 @@ export const GAME_DATA = {
     { name: "Combined Arms", intel: "Everything at once", reward: 230, groups: [{ type: "scout", count: 10, gap: 0.38 }, { type: "jammer", count: 3, gap: 0.78 }, { type: "mender", count: 2, gap: 0.9 }, { type: "carrier", count: 6, gap: 0.72 }, { type: "bastion", count: 1, gap: 1.0 }] },
     { name: "Siege Walker", intel: "Final boss with escorts", reward: 0, groups: [{ type: "swarm", count: 8, gap: 0.22 }, { type: "boss", count: 1, gap: 0.1 }, { type: "shield", count: 5, gap: 0.58 }, { type: "jammer", count: 2, gap: 1.05 }, { type: "mender", count: 2, gap: 1.1 }] },
   ],
+  art: {
+    mode: "auto",
+    towers: {
+      rifle: {
+        base: { src: "assets/towers/rifle/base.png", width: 46, height: 60, anchorX: 0.5, anchorY: 0.82 },
+        branches: {
+          rapid: { src: "assets/towers/rifle/rapid.png", width: 50, height: 60, anchorX: 0.5, anchorY: 0.82 },
+          piercer: { src: "assets/towers/rifle/piercer.png", width: 50, height: 64, anchorX: 0.5, anchorY: 0.84 },
+        },
+      },
+      missile: {
+        base: { src: "assets/towers/missile/base.png", width: 60, height: 54, anchorX: 0.5, anchorY: 0.78 },
+        branches: {
+          cluster: { src: "assets/towers/missile/cluster.png", width: 62, height: 56, anchorX: 0.5, anchorY: 0.78 },
+          bunker: { src: "assets/towers/missile/bunker.png", width: 60, height: 60, anchorX: 0.5, anchorY: 0.8 },
+        },
+      },
+      railgun: {
+        base: { src: "assets/towers/railgun/base.png", width: 56, height: 76, anchorX: 0.5, anchorY: 0.88 },
+        branches: {
+          overcharge: { src: "assets/towers/railgun/overcharge.png", width: 64, height: 84, anchorX: 0.5, anchorY: 0.9 },
+          cycling: { src: "assets/towers/railgun/cycling.png", width: 64, height: 78, anchorX: 0.5, anchorY: 0.88 },
+        },
+      },
+      emp: {
+        base: { src: "assets/towers/emp/base.png", width: 52, height: 72, anchorX: 0.5, anchorY: 0.86 },
+        branches: {
+          freeze: { src: "assets/towers/emp/freeze.png", width: 58, height: 76, anchorX: 0.5, anchorY: 0.86 },
+          breaker: { src: "assets/towers/emp/breaker.png", width: 58, height: 74, anchorX: 0.5, anchorY: 0.86 },
+        },
+      },
+      drone: {
+        base: { src: "assets/towers/drone/base.png", width: 58, height: 58, anchorX: 0.5, anchorY: 0.7 },
+        branches: {
+          interceptor: { src: "assets/towers/drone/interceptor.png", width: 64, height: 60, anchorX: 0.5, anchorY: 0.7 },
+          hunter: { src: "assets/towers/drone/hunter.png", width: 60, height: 60, anchorX: 0.5, anchorY: 0.72 },
+        },
+      },
+    },
+    enemies: {
+      scout: { src: "assets/enemies/scout.png", width: 34, height: 24, anchorX: 0.5, anchorY: 0.68 },
+      carrier: { src: "assets/enemies/carrier.png", width: 38, height: 28, anchorX: 0.5, anchorY: 0.76 },
+      shield: { src: "assets/enemies/shield.png", width: 34, height: 28, anchorX: 0.5, anchorY: 0.72 },
+      swarm: { src: "assets/enemies/swarm.png", width: 22, height: 18, anchorX: 0.5, anchorY: 0.66 },
+      jammer: { src: "assets/enemies/jammer.png", width: 34, height: 30, anchorX: 0.5, anchorY: 0.76 },
+      splitter: { src: "assets/enemies/splitter.png", width: 30, height: 28, anchorX: 0.5, anchorY: 0.74 },
+      mender: { src: "assets/enemies/mender.png", width: 34, height: 32, anchorX: 0.5, anchorY: 0.78 },
+      bastion: { src: "assets/enemies/bastion.png", width: 46, height: 34, anchorX: 0.5, anchorY: 0.8 },
+      boss: { src: "assets/enemies/boss.png", width: 72, height: 64, anchorX: 0.5, anchorY: 0.84 },
+    },
+    projectiles: {
+      rifle: { src: "assets/projectiles/rifle.png", width: 12, height: 12, anchorX: 0.5, anchorY: 0.5 },
+      missile: { src: "assets/projectiles/missile.png", width: 18, height: 18, anchorX: 0.5, anchorY: 0.5 },
+      railgun: { src: "assets/projectiles/railgun.png", width: 16, height: 16, anchorX: 0.5, anchorY: 0.5 },
+      emp: { src: "assets/projectiles/emp.png", width: 18, height: 18, anchorX: 0.5, anchorY: 0.5 },
+      drone: { src: "assets/projectiles/drone.png", width: 16, height: 16, anchorX: 0.5, anchorY: 0.5 },
+    },
+  },
   abilities: {
     airstrike: { name: "Airstrike", cooldown: 18, radius: 1.35, damage: 180, color: "#ffcf5a", text: "Area burst" },
     empPulse: { name: "EMP Pulse", cooldown: 15, radius: 1.7, damage: 30, slow: 0.25, slowTime: 4.5, color: "#6ff3d0", text: "Slow and shield break" },

@@ -1,4 +1,5 @@
 import { cellKey, centerOf, classifyBuildCell, currentPath, terrainHas, towerStats } from "./core.js";
+import { drawEnemySprite, drawProjectileSprite, drawTowerSprite, hasEnemySprite, hasProjectileSprite, hasTowerSprite } from "./assets.js";
 
 function drawTile(ctx, grid, cell, fill, stroke = "#2a4037") {
   const p = centerOf(grid, cell);
@@ -239,6 +240,11 @@ function drawTowerLevel(ctx, p, tower) {
 function drawTower(ctx, grid, tower, now) {
   const p = centerOf(grid, tower);
   const stats = towerStats(tower);
+  const spriteScale = Math.max(0.7, grid.tileW / 34);
+  if (hasTowerSprite(tower) && drawTowerSprite(ctx, tower, p.x, p.y + 8, spriteScale)) {
+    drawTowerLevel(ctx, p, tower);
+    return;
+  }
   switch (tower.type) {
     case "rifle":
       drawRifleTower(ctx, p, tower, stats, now);
@@ -411,37 +417,40 @@ function drawEnemy(ctx, enemy, now) {
   ctx.ellipse(enemy.x, enemy.y + 10, width * 0.7, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  switch (enemy.type) {
-    case "scout":
-      drawScout(ctx, enemy, width, height, bob);
-      break;
-    case "carrier":
-      drawCarrier(ctx, enemy, width, height, bob);
-      break;
-    case "shield":
-      drawShieldDrone(ctx, enemy, width, height, bob);
-      break;
-    case "swarm":
-      drawSwarmBot(ctx, enemy, width, height, bob);
-      break;
-    case "jammer":
-      drawJammer(ctx, enemy, width, height, bob, now);
-      break;
-    case "splitter":
-      drawSplitter(ctx, enemy, width, height, bob);
-      break;
-    case "mender":
-      drawMender(ctx, enemy, width, height, bob, now);
-      break;
-    case "bastion":
-      drawBastion(ctx, enemy, width, height, bob);
-      break;
-    case "boss":
-      drawBoss(ctx, enemy, width, height, bob, now);
-      break;
-    default:
-      ctx.fillStyle = enemy.def.color;
-      ctx.fillRect(enemy.x - width / 2, enemy.y - height / 2 + bob, width, height);
+  const spriteScale = Math.max(0.7, width / 34);
+  if (!hasEnemySprite(enemy) || !drawEnemySprite(ctx, enemy, enemy.x, enemy.y + 8 + bob, spriteScale)) {
+    switch (enemy.type) {
+      case "scout":
+        drawScout(ctx, enemy, width, height, bob);
+        break;
+      case "carrier":
+        drawCarrier(ctx, enemy, width, height, bob);
+        break;
+      case "shield":
+        drawShieldDrone(ctx, enemy, width, height, bob);
+        break;
+      case "swarm":
+        drawSwarmBot(ctx, enemy, width, height, bob);
+        break;
+      case "jammer":
+        drawJammer(ctx, enemy, width, height, bob, now);
+        break;
+      case "splitter":
+        drawSplitter(ctx, enemy, width, height, bob);
+        break;
+      case "mender":
+        drawMender(ctx, enemy, width, height, bob, now);
+        break;
+      case "bastion":
+        drawBastion(ctx, enemy, width, height, bob);
+        break;
+      case "boss":
+        drawBoss(ctx, enemy, width, height, bob, now);
+        break;
+      default:
+        ctx.fillStyle = enemy.def.color;
+        ctx.fillRect(enemy.x - width / 2, enemy.y - height / 2 + bob, width, height);
+    }
   }
 
   if (enemy.shield > 0) {
@@ -499,6 +508,7 @@ function drawEffect(ctx, effect) {
 }
 
 function drawProjectile(ctx, p) {
+  if (hasProjectileSprite(p.kind) && drawProjectileSprite(ctx, p.kind, p.x, p.y, 1)) return;
   if (p.beam) {
     ctx.strokeStyle = p.color;
     ctx.lineWidth = p.kind === "railgun" ? 5 : 4;

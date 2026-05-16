@@ -100,6 +100,11 @@ const grid = createGrid(GAME_DATA.grid);
 }
 
 {
+  assert(GAME_DATA.art.towers.rifle.base.src.endsWith("base.png"), "tower art manifest should define base sprite paths");
+  assert(GAME_DATA.art.enemies.boss.width > GAME_DATA.art.enemies.scout.width, "boss sprite footprint should be larger than scout");
+}
+
+{
   const state = baseState();
   state.towers.push(makeTower(GAME_DATA.towers, "rifle", 2, 12));
   const payload = serializeState(state, GAME_DATA.abilities, true);
