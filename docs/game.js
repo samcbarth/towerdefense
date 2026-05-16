@@ -18,6 +18,7 @@ const ui = {
   nextWave: document.getElementById("nextWave"),
   soundToggle: document.getElementById("soundToggle"),
   muteToggle: document.getElementById("muteToggle"),
+  audioStatus: document.getElementById("audioStatus"),
   volume: document.getElementById("volume"),
   overlay: document.getElementById("overlay"),
   start: document.getElementById("start"),
@@ -62,12 +63,23 @@ const audio = {
   volume: 0.7,
   lastFireAt: 0,
   lastImpactAt: 0,
+  fallbackUrl: null,
 };
+
+function setAudioStatus(text, mode = "") {
+  ui.audioStatus.textContent = text;
+  ui.audioStatus.classList.toggle("ready", mode === "ready");
+  ui.audioStatus.classList.toggle("blocked", mode === "blocked");
+}
 
 function ensureAudio() {
   if (audio.context) {
     if (audio.context.state === "suspended") {
-      audio.context.resume().catch(() => {});
+      audio.context.resume()
+        .then(() => setAudioStatus(`Audio ${audio.context.state}`, audio.context.state === "running" ? "ready" : ""))
+        .catch(() => setAudioStatus("Audio blocked", "blocked"));
+    } else {
+      setAudioStatus(`Audio ${audio.context.state}`, audio.context.state === "running" ? "ready" : "");
     }
     return true;
   }
@@ -77,6 +89,7 @@ function ensureAudio() {
     ui.soundToggle.textContent = "No Audio";
     ui.soundToggle.disabled = true;
     ui.muteToggle.disabled = true;
+    setAudioStatus("No Web Audio", "blocked");
     return false;
   }
 
@@ -84,7 +97,9 @@ function ensureAudio() {
   audio.master = audio.context.createGain();
   audio.master.gain.value = audio.muted ? 0 : audio.volume;
   audio.master.connect(audio.context.destination);
-  audio.context.resume().catch(() => {});
+  audio.context.resume()
+    .then(() => setAudioStatus(`Audio ${audio.context.state}`, audio.context.state === "running" ? "ready" : ""))
+    .catch(() => setAudioStatus("Audio blocked", "blocked"));
   return true;
 }
 
@@ -97,6 +112,57 @@ function setMuted(muted) {
   audio.muted = muted;
   if (audio.master) audio.master.gain.value = muted ? 0 : audio.volume;
   ui.muteToggle.textContent = muted ? "Unmute" : "Mute";
+  setAudioStatus(muted ? "Muted" : "Audio ready", muted ? "" : "ready");
+}
+
+function createFallbackBeepUrl() {
+  if (audio.fallbackUrl) return audio.fallbackUrl;
+
+  const sampleRate = 44100;
+  const duration = 0.55;
+  const samples = Math.floor(sampleRate * duration);
+  const bytesPerSample = 2;
+  const dataSize = samples * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  function writeString(offset, text) {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+  }
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  for (let i = 0; i < samples; i++) {
+    const t = i / sampleRate;
+    const envelope = Math.max(0, 1 - t / duration);
+    const sweep = 440 + t * 620;
+    const value = Math.sin(Math.PI * 2 * sweep * t) * envelope * 0.55;
+    view.setInt16(44 + i * 2, value * 32767, true);
+  }
+
+  audio.fallbackUrl = URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
+  return audio.fallbackUrl;
+}
+
+function playFallbackBeep() {
+  if (audio.muted) return;
+  const beep = new Audio(createFallbackBeepUrl());
+  beep.volume = Math.min(1, Math.max(0, audio.volume));
+  beep.play()
+    .then(() => setAudioStatus("Audio playing", "ready"))
+    .catch(() => setAudioStatus("Click blocked", "blocked"));
 }
 
 function playTone({ frequency = 440, duration = 0.12, type = "sine", gain = 0.08, slideTo = null, delay = 0 }) {
@@ -192,6 +258,8 @@ function playAbility(key) {
 
 function playTestSound() {
   setMuted(false);
+  ensureAudio();
+  playFallbackBeep();
   playTone({ frequency: 330, duration: 0.13, type: "triangle", gain: 0.08 });
   playTone({ frequency: 550, duration: 0.13, type: "triangle", gain: 0.075, delay: 0.12 });
   playTone({ frequency: 825, duration: 0.22, type: "triangle", gain: 0.07, delay: 0.24 });

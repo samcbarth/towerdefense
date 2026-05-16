@@ -139,6 +139,27 @@ h2 {
   accent-color: var(--accent);
 }
 
+.audio-status {
+  min-width: 118px;
+  border: 1px solid var(--line);
+  background: #0d1714;
+  color: var(--muted);
+  padding: 10px;
+  text-align: center;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.audio-status.ready {
+  color: var(--accent);
+}
+
+.audio-status.blocked {
+  color: var(--danger);
+}
+
 .game-frame {
   position: relative;
   border: 1px solid var(--line);
